@@ -1,0 +1,12 @@
+mission_manager:
+  ros__parameters:
+    global_frame: map
+    # 按 x, y, yaw 排列，距离为米，朝向为弧度。
+    waypoints: [1.0, 1.0, 0.0, 7.0, 1.0, 1.57, 7.0, 7.0, 3.14, 1.0, 7.0, -1.57]
+    patrol_dwell_sec: 1.0
+    goal_timeout_sec: 90.0
+    cancel_timeout_sec: 3.0
+    odom_timeout_sec: 1.0
+    max_retries: 1
+    max_queue: 64
+    log_directory: ''

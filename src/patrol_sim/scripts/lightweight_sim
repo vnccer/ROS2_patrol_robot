@@ -1,0 +1,3 @@
+#!/usr/bin/env python3
+from patrol_sim.simulator import main
+main()

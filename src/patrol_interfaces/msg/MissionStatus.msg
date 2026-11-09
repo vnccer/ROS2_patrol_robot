@@ -1,0 +1,12 @@
+builtin_interfaces/Time stamp
+string state
+string active_id
+uint8 active_priority
+uint32 patrol_index
+uint32 queue_size
+uint64 patrol_completed
+uint64 events_completed
+uint64 tasks_failed
+bool paused
+bool motion_permitted
+string fault

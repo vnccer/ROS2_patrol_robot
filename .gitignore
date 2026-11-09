@@ -3,3 +3,9 @@
 /log/
 .vscode/
 __pycache__/
+.cache/
+.pytest_cache/
+tools/bin/
+preview_runs/
+test_results/
+*.pyc

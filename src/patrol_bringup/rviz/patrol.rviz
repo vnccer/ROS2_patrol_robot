@@ -1,0 +1,46 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ''
+  Global Options:
+    Fixed Frame: map
+    Background Color: 20; 29; 36
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 1
+    - Class: rviz_default_plugins/Map
+      Name: Indoor map
+      Enabled: true
+      Topic:
+        Value: /map
+        Durability Policy: Transient Local
+    - Class: rviz_default_plugins/RobotModel
+      Name: Robot
+      Enabled: true
+      Description Topic:
+        Value: /robot_description
+    - Class: rviz_default_plugins/LaserScan
+      Name: Laser
+      Enabled: true
+      Topic:
+        Value: /scan
+        Reliability Policy: Best Effort
+      Size (m): 0.035
+    - Class: rviz_default_plugins/Path
+      Name: Planned route
+      Enabled: true
+      Topic:
+        Value: /plan
+      Color: 100; 180; 255
+  Views:
+    Current:
+      Class: rviz_default_plugins/TopDownOrtho
+      Scale: 65
+      X: 4
+      Y: 4
+Window Geometry:
+  Width: 1100
+  Height: 850

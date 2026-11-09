@@ -1,0 +1,62 @@
+# 从“改了会怎样”开始
+
+启动后打开 `http://127.0.0.1:8765`。ROS 模式在 Ubuntu 浏览器打开；Windows 预览在 Windows 浏览器打开。同一时刻只启动一个后端，避免端口与话题冲突。
+
+| 想观察的效果 | 怎么改/怎么操作 | 预期现象 |
+|---|---|---|
+| 巡逻被中断 | 机器人走向 P2 时，在地图另一侧点一下并发送警报 | `PATROLLING → CANCELLING → RESPONDING`；事件结束后重新去 P2 |
+| 紧急事件插队 | 先发优先级 20 的警报，再发 100 | 20 的任务挂回队列，100 先执行；随后恢复 20，再恢复巡逻 |
+| 同级事件是否公平 | 连续发三个相同优先级、不同 ID 的警报 | 按接收顺序处理；同级不抢占当前任务 |
+| 重复消息 | 手填 `alarm-001`，连续发送两次 | 第二次记录为 `duplicate`；不会创建第二个任务 |
+| 排队过期 | 长处置事件运行时，发一个 TTL=2 的低优先级事件 | 队列里的短 TTL 事件过期并记录 `expired` |
+| 无法抵达 | 目标填 X=4、Y=2（墙内） | Nav2 失败或目标超时；按配置重试，最终记录失败并恢复巡逻 |
+| 处置被抢占 | 把处置时间设为 20，抵达后再发更高优先级事件 | 处置任务重新排队；恢复时重新导航，处置时间重新开始 |
+| 人工暂停 | 运动时暂停，之后继续 | 暂停取消当前导航，保留巡逻点；继续重新导航至该点 |
+| 里程计断流 | 点击中断里程计，稍后恢复 | 速度门禁先停车；任务管理器锁存 `FAULT`；传感器恢复后需点击解除故障 |
+| 激光断流 | 点击中断激光，稍后恢复 | 门禁停止输出非零速度；Nav2 可能因进展不足而失败/重试；可观察恢复后的不同结果 |
+| 底盘卡住 | 点击卡住底盘 | 实际里程计速度归零；Nav2 执行恢复行为或失败；目标期限兜底 |
+| 保护与暂停是否独立 | 先暂停，再断里程计，恢复里程计并解除故障 | 仍保持 `PAUSED`；需单独点继续 |
+
+Windows 预览会使用相同调度状态机，但简化导航直接反馈到达/失败，不模拟 Nav2 的 DWB、恢复行为、AMCL、TF 或真实传感器误差。`--speed 1.0` 是预览速度，默认 ROS 底盘速度上限为 0.26 m/s。
+
+## 最值得改的几个文件
+
+| 改什么 | 文件/入口 | 修改后 |
+|---|---|---|
+| 巡逻点、朝向、停留、重试次数、目标期限 | `src/patrol_bringup/config/mission.yaml` | ROS 重启；使用 symlink install 时无需重编译 C++ |
+| 每个事件的优先级、TTL、处置时间 | 网页表单 | 立即影响新事件 |
+| 运行中的目标期限/后续巡逻停留 | `ros2 param set /mission_manager goal_timeout_sec 30.0` / `patrol_dwell_sec 5.0` | 立即更新目标期限；停留参数用于后续创建的巡逻任务 |
+| 优先级规则、恢复规则 | `src/patrol_manager/include/patrol_manager/mission.hpp` | 编译并重启 ROS；预览运行前重编译核心 |
+| 速度与轨迹效果 | `src/patrol_bringup/config/nav2.yaml` 中 DWB 的 `max_vel_x/max_speed_xy`、`velocity_smoother.max_velocity` | 重启；速度还受 `velocity_guard` 上限约束 |
+| 底盘速度许可上限 | `system.launch.py` 的 velocity_guard 参数 `max_linear/max_angular` | 配合 Nav2 上限一起修改并重启 |
+| 地图障碍物 | `src/patrol_sim/patrol_sim/geometry.py` 的 `WALLS` | 运行 `python3 tools/generate_assets.py`，重新启动整个系统 |
+
+生成器会重新从上游参数快照生成 `nav2.yaml`，覆盖手动调参；长期保留的导航调整请同步写进 `generate_assets.py`，或复制参数文件并用 `nav_params:=/绝对路径/your_nav.yaml` 启动。
+
+## 记录和评估
+
+ROS 模式每次启动写入 `~/.ros/patrol_runs/<运行编号>/records.csv`。Windows 预览写入工作空间的 `preview_runs/<时间>/records.csv`。每条记录包含 ROS/墙钟时间、单调时间、事件类型、任务 ID、细节和数值。
+
+```bash
+python3 tools/report_metrics.py ~/.ros/patrol_runs/<运行编号>/records.csv --output metrics.json
+```
+
+`dispatched` 的数值是事件从本机接收到首次/重新派发的耗时；`arrived` 是接收到抵达的耗时，包含排队和行驶。报表按每个事件首次派发/首次抵达统计延迟，并保留超时、失败和观察结束时未完成的事件。`completed` 表示模拟停留计时结束，不代表真实安全事件已经解决。巡逻恢复报表只统计被抢占目标 ID 是否重新派发，不声称物理返回误差或每次抢占都恢复成功。
+
+## 正式 ROS 验收
+
+在终端 1：
+
+```bash
+bash scripts/run.sh rviz:=false panel:=false
+```
+
+终端 2（工程目录）：
+
+```bash
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+python3 tools/ros_acceptance.py
+```
+
+该脚本检查实际 ROS 消息、Nav2 action 路径、抢占、去重、任务恢复和断流停车；结果写到 `test_results/ros_acceptance.json`。预览测试和 C++ 单元测试不能替代这一项。Gazebo 模式还需在虚拟机检查模型生成、AMCL 定位、激光与地图对齐以及完整巡逻，这些不由轻量后端验收代替。

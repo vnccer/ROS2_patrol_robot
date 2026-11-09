@@ -2,13 +2,21 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>patrol_manager</name>
-  <version>0.0.1</version>
-  <description>Minimal C++ patrol node for learning ROS 2.</description>
+  <version>1.0.0</version>
+  <description>C++ mission scheduling, priority preemption and Nav2 integration.</description>
   <maintainer email="you@example.com">Your Name</maintainer>
-  <license>TODO</license>
+  <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <depend>rclcpp</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>rclcpp_action</depend>
+  <depend>nav2_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>lifecycle_msgs</depend>
+  <depend>patrol_interfaces</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

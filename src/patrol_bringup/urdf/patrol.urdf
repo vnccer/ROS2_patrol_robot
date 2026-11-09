@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<robot name="patrol_light">
+  <material name="teal"><color rgba="0.2 0.8 0.65 1"/></material>
+  <link name="base_link">
+    <visual><origin xyz="0 0 .10"/><geometry><cylinder radius=".17" length=".20"/></geometry><material name="teal"/></visual>
+  </link>
+  <link name="base_scan"/>
+  <joint name="laser_joint" type="fixed"><parent link="base_link"/><child link="base_scan"/><origin xyz="0 0 .22"/></joint>
+  <link name="heading"/>
+  <joint name="heading_joint" type="fixed"><parent link="base_link"/><child link="heading"/><origin xyz=".16 0 .1"/></joint>
+</robot>
