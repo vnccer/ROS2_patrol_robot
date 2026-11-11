@@ -1,5 +1,5 @@
 # Derived from ros-navigation/navigation2 nav2_bringup, humble. Apache-2.0.
-# Modified 2026-11-02: VM workload, radius, stopping threshold and sensor range.
+# Modified 2026-11-11: VM workload, BT timing, radius and sensor range.
 # Original snapshot and attribution: third_party/ and THIRD_PARTY_NOTICES.md.
 amcl:
   ros__parameters:
@@ -47,8 +47,10 @@ bt_navigator:
     global_frame: map
     robot_base_frame: base_link
     odom_topic: /odom
-    bt_loop_duration: 10
-    default_server_timeout: 20
+    # Milliseconds: allow more scheduling time in the teaching VM (was 100 Hz).
+    # This is the BT supervision rate; the controller stays at 10 Hz below.
+    bt_loop_duration: 50
+    default_server_timeout: 100
     wait_for_service_timeout: 1000
     plugin_lib_names:
     - nav2_compute_path_to_pose_action_bt_node

@@ -13,6 +13,7 @@ from patrol_interfaces.msg import Incident, MissionStatus, TaskRecord
 from tf2_ros import Buffer, TransformListener, TransformException
 from patrol_sim.geometry import WALLS
 from patrol_sim.http_api import serve
+from patrol_sim.runtime import run_node
 
 class Panel(Node):
     def __init__(self):
@@ -30,7 +31,7 @@ class Panel(Node):
         self.create_subscription(MissionStatus, 'patrol/status', self.status, 10)
         self.create_subscription(TaskRecord, 'patrol/records', self.record, 100)
         self.create_subscription(Path, 'plan', self.path, 10)
-        self.clients = {name: self.create_client(typ, name) for name,typ in (
+        self.service_clients = {name: self.create_client(typ, name) for name,typ in (
             ('patrol/set_paused',SetBool), ('patrol/emergency_stop',Trigger), ('patrol/recover',Trigger),
             ('patrol/sim/drop_odom',SetBool), ('patrol/sim/drop_scan',SetBool), ('patrol/sim/blocked',SetBool))}
         self.create_timer(.1, self.tick)
@@ -123,22 +124,19 @@ class Panel(Node):
         else:
             name,req = 'patrol/sim/'+action,SetBool.Request()
             req.data = bool(cmd['enabled'])
-        client = self.clients[name]
+        client = self.service_clients[name]
         if not client.service_is_ready():
             self.feedback(f'{name} unavailable (fault injection requires lightweight simulation)')
             return
         client.call_async(req).add_done_callback(self.completed)
 
-def main():
-    rclpy.init()
-    node = Panel()
+def close_panel(node):
     try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
-    finally:
         node.server.shutdown()
+    finally:
         node.server.server_close()
-        node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
+        node.thread.join(timeout=1.)
+
+
+def main():
+    run_node(Panel, close_panel)

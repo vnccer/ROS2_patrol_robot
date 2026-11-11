@@ -7,4 +7,4 @@ if [[ ! -f "$TASK_ROOT/install/setup.bash" ]]; then
   exit 1
 fi
 source "$TASK_ROOT/install/setup.bash"
-exec ros2 launch patrol_bringup system.launch.py "$@"
+exec python3 "$TASK_ROOT/tools/run_system.py" "$@"

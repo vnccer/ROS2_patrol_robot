@@ -1,4 +1,5 @@
 #include <chrono>
+#include <csignal>
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
@@ -20,17 +21,39 @@
 #include "patrol_interfaces/msg/mission_status.hpp"
 #include "patrol_interfaces/msg/task_record.hpp"
 
-using namespace std::chrono_literals;
-using Nav = nav2_msgs::action::NavigateToPose;
-using Handle = rclcpp_action::ClientGoalHandle<Nav>;
-static double wall_now() {
+// 三个using让后面的写法更简短
+using namespace std::chrono_literals; // 允许写50ms
+using Nav = nav2_msgs::action::NavigateToPose; // 起别名Nav
+using Handle = rclcpp_action::ClientGoalHandle<Nav>; // 起别名 Handle
+
+// A signal only requests exit. Keep ROS valid until the current callback ends.
+static volatile std::sig_atomic_t stop_requested = 0;
+static void request_stop(int) { stop_requested = 1; }
+
+// 两个static定义仅供当前.cpp文件使用的辅助函数
+static double wall_now() { //wall_now()返回单调时钟的秒数
   return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
-static std::string csv(const std::string &s) {
+static std::string csv(const std::string &s) { //csv()给字符串加引号，并处理内部引号，方便正确写入CSV文件
   std::string o="\""; for (char c:s) {if(c=='"')o+='"'; o+=c;} return o+'"';
 }
 
 // ROS 适配层：接警、调用 Nav2、记录结果；任务切换规则位于 mission.hpp。
+/*
+public和private的访问权限不同，public类外部可以访问，private类外部不能直接访问
+  public中只有一个构造函数MissionNode：读取设置、创建任务管理核心、准备日至文件、建立ROS2通信、启动定时器
+  private有两类内容：
+    一类是运行过程中需要一直保存的东西
+    另一类是管理员内部使用的工作函数
+
+两者配合例如：
+  // public 的构造函数里：安排每隔 50ms 做一次检查
+  timer_ = create_wall_timer(50ms, [this]{ tick(); });
+  // private 里：具体写“检查时要做什么”
+  void tick() {
+    // 检查、处理任务、记录日志……
+  }
+*/
 class MissionNode : public rclcpp::Node {
 public:
   MissionNode(): Node("mission_manager") {
@@ -80,10 +103,19 @@ public:
       });
     incidents_=create_subscription<patrol_interfaces::msg::Incident>("patrol/incidents",50,
       [this](patrol_interfaces::msg::Incident::ConstSharedPtr m){
+        // 计数器+1
+        ++incident_received_count_;
+        RCLCPP_INFO(
+          get_logger(),
+          "received=%u id=%s priority=%d",
+          incident_received_count_,
+          m->id.c_str(),
+          m->priority
+        );
         auto &q=m->target.pose.orientation;
         double norm=q.x*q.x+q.y*q.y+q.z*q.z+q.w*q.w;
         if(m->target.header.frame_id!=frame_ || !std::isfinite(norm) || std::abs(norm-1)>0.05) {
-          mission_->record("rejected","frame must be map and quaternion normalized",0,m->id); return;
+          mission_->record("rejected","坐标系必须为map, 姿态四元数必须经过归一化",0,m->id); return;
         }
         patrol::Task t; t.id=m->id; t.priority=m->priority;
         t.pose={m->target.pose.position.x,m->target.pose.position.y,
@@ -100,6 +132,13 @@ public:
       [this](std_srvs::srv::Trigger::Request::SharedPtr,std_srvs::srv::Trigger::Response::SharedPtr res){
         mission_->trip("operator emergency stop",wall_now()); publish_permit();
         res->success=true; res->message="Fault latched; use recover after checking health.";
+      });
+    shutdown_=create_service<std_srvs::srv::Trigger>("patrol/prepare_shutdown",
+      [this](std_srvs::srv::Trigger::Request::SharedPtr,std_srvs::srv::Trigger::Response::SharedPtr res){
+        mission_->pause(true,wall_now()); publish_permit();
+        // A pause acknowledgement alone does not mean the action has finished.
+        res->success=!mission_->flying;
+        res->message=res->success?"Ready to shut down.":"Waiting for navigation cancellation.";
       });
     recover_=create_service<std_srvs::srv::Trigger>("patrol/recover",
       [this](std_srvs::srv::Trigger::Request::SharedPtr,std_srvs::srv::Trigger::Response::SharedPtr res){
@@ -137,7 +176,7 @@ private:
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_;
   rclcpp::Subscription<patrol_interfaces::msg::Incident>::SharedPtr incidents_;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr pause_;
-  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr estop_,recover_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr estop_,recover_,shutdown_;
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr parameters_;
   rclcpp::TimerBase::SharedPtr timer_;
   std::ofstream log_;
@@ -147,6 +186,9 @@ private:
   std::string frame_;
   bool healthy() const {return seen_odom_&&wall_now()-last_odom_<odom_timeout_;}
   bool nav_ready() const {return life_active_&&wall_now()-life_reply_<3&&nav_->action_server_is_ready();}
+  
+  // 计数器成员变量
+  unsigned int incident_received_count_{0};
   void publish_permit() {
     std_msgs::msg::Bool m; m.data=mission_->permit()&&healthy()&&nav_ready(); permit_->publish(m);
   }
@@ -215,8 +257,16 @@ private:
   }
 };
 int main(int argc,char **argv) {
-  rclcpp::init(argc,argv);
-  try {rclcpp::spin(std::make_shared<MissionNode>());}
+  rclcpp::init(argc,argv,rclcpp::InitOptions(),rclcpp::SignalHandlerOptions::None);
+  std::signal(SIGINT,request_stop);
+  std::signal(SIGTERM,request_stop);
+  try {
+    auto node=std::make_shared<MissionNode>();
+    rclcpp::executors::SingleThreadedExecutor executor;
+    executor.add_node(node);
+    while(rclcpp::ok() && !stop_requested) executor.spin_once(100ms);
+    executor.remove_node(node);
+  }
   catch(const std::exception &e) {RCLCPP_FATAL(rclcpp::get_logger("mission_manager"),"%s",e.what()); rclcpp::shutdown(); return 1;}
   rclcpp::shutdown(); return 0;
 }

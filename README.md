@@ -78,6 +78,22 @@ bash scripts/run.sh
 bash scripts/run.sh rviz:=false
 ```
 
+终端默认保留任务派发、到达、完成和网页地址，基础节点只输出警告及以上日志。
+关闭时按一次 `Ctrl+C`：脚本会先暂停任务、等待当前导航终结，再通过生命周期管理器关闭 Nav2，最后退出进程；通常需要几秒。
+请通过 `scripts/run.sh` 启动以使用这套退出顺序，直接运行 `ros2 launch` 不经过该保护。
+
+同步源码到 Ubuntu 后，以下命令更新本次涉及的三个包（无需重装依赖）：
+
+```bash
+cd ~/patrol_robot_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+colcon build --symlink-install --packages-select patrol_manager patrol_sim patrol_bringup
+bash scripts/run.sh rviz:=false
+```
+
+若将来仍出现 `Control loop missed its desired rate`，应检查虚拟机负载；行为树已改为 20 Hz，底盘控制仍为 10 Hz，这类性能警告会继续保留。
+
 **Gazebo 模式：**
 
 ```bash

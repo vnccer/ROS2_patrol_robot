@@ -1,6 +1,5 @@
 import math
 import time
-import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from geometry_msgs.msg import TransformStamped, Twist
@@ -9,6 +8,7 @@ from sensor_msgs.msg import LaserScan
 from std_srvs.srv import SetBool
 from tf2_ros import TransformBroadcaster
 from patrol_sim.geometry import WALLS, integrate, raycast
+from patrol_sim.runtime import run_node
 
 class Simulator(Node):
     """只模拟底盘和传感器；目标与路径全部交给真正的 Nav2。"""
@@ -73,13 +73,4 @@ class Simulator(Node):
         self.scan.publish(msg)
 
 def main():
-    rclpy.init()
-    node = Simulator()
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
+    run_node(Simulator)

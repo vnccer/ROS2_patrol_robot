@@ -9,6 +9,7 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Bool
 from patrol_sim.guard_logic import GuardPolicy
+from patrol_sim.runtime import run_node
 
 class VelocityGuard(Node):
     """底盘唯一的速度出口：指令、许可、里程计、激光都新鲜才放行。"""
@@ -45,14 +46,10 @@ class VelocityGuard(Node):
         self.pub.publish(msg)
 
 def main():
-    rclpy.init()
-    node = VelocityGuard()
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
-    finally:
+    run_node(VelocityGuard, stop_motion)
+
+
+def stop_motion(node):
+    # run_node keeps the context alive until this last stop command is sent.
+    if rclpy.ok():
         node.pub.publish(Twist())
-        node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()

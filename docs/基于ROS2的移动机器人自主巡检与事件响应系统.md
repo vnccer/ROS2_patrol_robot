@@ -815,8 +815,6 @@ ros2 service call /patrol/set_paused std_srvs/srv/SetBool "{data: false}"
 
 场景：机器人正在巡逻 -> 收到报警 -> 前往报警位置 -> 到达 -> 处理3s -> 完成报警任务
 
-## 2.6 整体调用链：Topic、Service、Action、Timer
-
 ### 2.6.1 主调用链：报警 → 导航 → 完成
 
 ```text
@@ -907,4 +905,197 @@ mission_node.cpp → start()
 - `mission_node.cpp`：负责 ROS2 通信、定时驱动和执行指令。
 - `mission.hpp`：负责任务队列、优先级、状态机和调度决策。
 - Nav2：负责实际导航，不负责决定报警任务优先级。
+
+# 三、C++开发
+
+## 3.1 第一阶段：修改源码
+
+### 3.1.1 给报警接收回调增加计数
+
+**需求：**
+每进入一次报警回调，接收次数+1，并打印：接收次数、报警ID、优先级。
+统计口径为：收到消息，因此重复消息和随后被拒绝的消息也计数。
+每次节点进程启动时从0开始。
+
+**输入：**进入一次报警回调；**输出：**打印接收次数、报警ID、优先级
+
+**联系：**2.1节记录报警回调所在位置
+
+```C++
+incidents_ = create_subscription<patrol_interfaces::msg::Incident>(
+    "patrol/incidents", 50,
+    [this](patrol_interfaces::msg::Incident::ConstSharedPtr m) {
+        // 这里是收到报警后执行的代码
+    });
+```
+
+>**知识点：**
+>
+>1. `类名`、`对象`、`节点对象`、`成员`、`成员变量`、`成员函数`理解
+>
+>```c++
+>// 一、定义类：类名MissionNode（这里类定义里的:表示继承rclcpp::Node）
+>class MissionNode : public rclcpp::Node {
+>public:
+>   // 创建对象时执行，用来完成初始化，这里的mission_manager是这个对象的ROS2节点名称（这里构造函数后的:表示接下来进行初始化）
+>   MissionNode() : Node("mission_manager") {
+>       frame_ = declare_parameter<std::string>(
+>           "global_frame", "map");
+>   }
+>private:
+>   // 成员变量：保存数据
+>   std::string frame_;
+>   // 成员函数：执行操作
+>   void tick() {
+>       // 检查任务、处理调度、发布状态……
+>   }
+>};
+>
+>// 二、程序运行入口：在这里创建对象
+>int main(int argc, char **argv) {
+>   rclcpp::init(argc, argv);
+>
+>   // 执行make_shared创建出了对象（具体实例）（由于class MissionNode继承了ROS2的Node，因此创建出来的对象具备ROS2节点功能，所以也可以叫一个ROS2节点对象），并返回智能指针，用node这个变量来保存智能指针，所以node这里是智能指针变量，指向一个MissionNode类型的对象（这里创建出来的对象本身没有单独取变量名，而是通过node访问的）
+>   auto node = std::make_shared<MissionNode>();
+>
+>   rclcpp::spin(node);
+>   rclcpp::shutdown();
+>   return 0;
+>}
+>```
+>
+>2. `mission_node.cpp`中`public`理解
+>
+>```C++
+>public:
+> MissionNode() : Node("mission_manager") {
+>   // 第一部分：准备配置和运行资源
+>
+>   // 第二部分：建立通信接口、注册回调
+>
+>   // 第三部分：创建定时器
+> }
+>
+>// public: 是访问权限标记，表示后面的成员可以从类外访问。
+>// MissionNode() 是构造函数，创建 MissionNode 对象时执行。
+>// Node("mission_manager") 用来初始化父类节点，并设置节点名称。
+>// 最外层 { ... } 包住了你划分的全部三部分
+>```
+>
+>3. `mission_node.cpp`中`incidents_=create_subscription`框架理解
+>
+>```c++
+>incidents_ = create_subscription<patrol_interfaces::msg::Incident>(
+>   "patrol/incidents", 50,
+>   [this](patrol_interfaces::msg::Incident::ConstSharedPtr m){
+>       // 收到报警后执行的代码
+>   });
+>
+>// 创建节点对象时，进行create_subscription，建立订阅，并登记这个回调；
+>// 后续运行时收到报警，进行[this](){...}里面的处理代码，代码虽然写在构造函数里，回调函数体却是留给后续事件触发时执行的。
+>```
+>
+>4. `mission_node.cpp`中`[this](... m){...}`内容理解
+>
+>```c++
+>回调参数 m：本次收到的报警
+>    ↓
+>取出朝向，检查坐标系和四元数
+>    ↓ 不符合要求就记录并结束本次处理
+>创建任务 t
+>    ↓
+>填写 ID、优先级、位置、朝向和时间
+>    ↓
+>提交给业务任务管理器
+>
+>/*
+>    对于[this](... m){...}
+>    1. [this]允许函数使用当前节点对象的成员；
+>    2. (... m)声明函数接收的参数，(参数类型 参数名字)；
+>    3. {...}函数体，收到消息后要做的事情。
+>*/
+>
+>auto &q=m->target.pose.orientation;
+>	// 理解：给消息中的四元数起一个简短的别名
+>	// 右边的报警消息m -> 目标target -> 位姿pose -> 朝向orientation()
+>	// &：声明引用，让 q 成为原数据的别名，不复制一份
+>	// ->：通过指针，访问它指向的对象里的成员
+>	// 之后的q.x相当于m->target.pose.orientation.x
+>
+>double norm=q.x*q.x+q.y*q.y+q.z*q.z+q.w*q.w;
+>	// 单位四元数应该满足平方和为1：x² + y² + z² + w² = 1
+>
+>if(m->target.header.frame_id!=frame_ || !std::isfinite(norm) || std::abs(norm-1)>0.05) {
+>	mission_->record("拒绝","坐标系必须为map, 姿态四元数必须经过归一化",0,m->id); return;
+>}
+>	// 拒绝条件：消息的坐标系与节点要求的不一致，项目默认要求map；平方和出现无穷大或NaN等无效数值；平方和偏离1太多，不符合单位四元数要求
+>	// 满足拒绝条件执行：找到mission_指向的任务管理器，调用record()函数，让它记录这次拒绝，而参数中0是记录附带的数值，m->id表示这条记录属于哪个报警
+>	/*
+>		mission_：类型是智能指针，负责保存和管理一个任务管理器对象，它与真正的任务管理器对象的关系：↓
+>		mission_（智能指针）
+>            │
+>            └──指向──→ 一个 Mission 对象（写在mission.hpp中）
+>                         ├──保存任务队列
+>                         ├──保存当前任务
+>                         ├──提供 submit() 函数
+>                         └──提供 record() 函数...
+>	*/
+>
+>patrol::Task t; t.id=m->id; t.priority=m->priority;
+>	// 使用patrol::Task这个类型，创建一个名叫t的任务对象；把报警ID填入任务；把报警优先级填入任务
+>	// t.id=m->id：读取报警消息里的ID，把这个字符串复制到任务的ID字段中
+>	// 比如m->一条Incident消息，id: "alarm-001"，priority: 80
+>
+>
+>t.pose={m->target.pose.position.x,m->target.pose.position.y,
+>	std::atan2(2*(q.w*q.z+q.x*q.y),1-2*(q.y*q.y+q.z*q.z))};
+>	// t.pose = {目标 x 坐标, 目标 y 坐标, 从四元数提取的 yaw};
+>	// std::atan2()用于从四元数提取机器人在平面上的朝向角yaw(弧度)
+>
+>t.expires=m->ttl_sec; t.handling=m->handling_sec;
+>	// 把消息中的有效期ttl_sec，到达后的模拟处置时间handling_sec复制到任务中
+>
+>mission_->submit(t,wall_now());
+>	// 指向业务任务管理器的成员指针，调用任务管理器的提交函数，提交t和当前单调时钟时间
+>```
+
+**思路：**
+
+1. 用一个变量保存“已收到多少条报警”
+   成员变量让计数随MissionNode对象持续保存
+   private控制访问权限，让外部代码不能直接修改它
+
+   ```c++
+   unsigned int incident_received_count_{0};
+   ```
+
+2. 每进入一次报警回调，就让它+1
+   ```C++
+   ++incident_received_count_;
+   ```
+
+3. 打印次数、ID和优先级
+
+   ```C++
+   RCLCPP_INFO(
+   	get_logger(),
+   	"received=%u id=%s priority=%d",
+   	incident_received_count_,
+   	m->id.c_str(),
+   	m->priority
+   );
+   ```
+
+4. 一个terminal：`ros2 topic echo /patrol/incidents`
+   另一terminal：`ros2 topic pub --once /patrol/incidents patrol_interfaces/msg/Incident '{id: alarm-002, priority: 80, target: {header: {frame_id: map}, pose: {position: {x: 6.5, y: 6.5}, orientation: {w: 1.0}}}, ttl_sec: 180.0, handling_sec: 3.0}'`
+
+### 3.1.2 把报警处理提取成成员函数
+
+**要求：**将现有报警 Lambda 中的处理逻辑移入一个具名成员函数。订阅处的 Lambda 负责调用该函数，业务行为保持一致。
+
+## 3.2 第二阶段：独立写节点
+
+## 3.3 第三阶段：开发业务功能
+
+## 3.4 第四阶段：调试与交付
 

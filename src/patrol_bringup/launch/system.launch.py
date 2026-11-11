@@ -25,8 +25,24 @@ def setup(context):
     nodes = []
 
     def node(pkg, executable, name=None, parameters=None, **kw):
-        return Node(package=pkg, executable=executable, name=name or executable,
-                    parameters=parameters or [], output='screen', **kw)
+        node_name = name or executable
+
+        # 任务进展和网页地址保留INFO，其余节点只显示警告及以上信息
+        log_level =(
+            'info'
+            if node_name in ('mission_manager','control_panel')
+            else 'warn'
+        )
+
+        return Node(
+            package=pkg,
+            executable=executable,
+            name=node_name,
+            parameters=parameters or [],
+            output='screen',
+            ros_arguments=['--log-level', log_level],
+            **kw
+        )
 
     if not sim_time:
         nodes += [node('patrol_sim','lightweight_sim'),
