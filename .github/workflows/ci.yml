@@ -3,12 +3,22 @@ on: [push, pull_request, workflow_dispatch]
 jobs:
   humble:
     runs-on: ubuntu-22.04
+    # Keep ROS dependencies separate from the hosted runner's LLVM/libunwind
+    # development packages, which can prevent Nav2's glog dependency installing.
+    container:
+      image: ros:humble-ros-base-jammy
+    defaults:
+      run:
+        shell: bash
+    env:
+      DEBIAN_FRONTEND: noninteractive
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-      - uses: ros-tooling/setup-ros@v0.7
-        with:
-          required-ros-distributions: humble
+      - name: Prepare container tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends sudo
       - name: Install and build
         run: bash scripts/setup_ubuntu.sh
       - name: Real Nav2 acceptance (headless)

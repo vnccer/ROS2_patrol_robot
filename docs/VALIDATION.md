@@ -41,3 +41,13 @@ Windows 本地验证：25 项 Python 测试通过，其中新增 12 项使用 RO
 这些检查不等同于 Ubuntu/Nav2 实测。仍需在 Ubuntu 重新构建三个包，检查网页能打开、巡逻和插队可用，再在导航过程中按一次 Ctrl+C，确认无 Python 回溯、无 context invalid、无 exit code -11。20 Hz 设置能否消除全部行为树超时，也需要观察实际虚拟机负载。
 
 退出顺序参考 [Nav2 Humble 生命周期管理器源码](https://github.com/ros-navigation/navigation2/blob/humble/nav2_lifecycle_manager/src/lifecycle_manager.cpp)；该实现按节点列表的逆序执行停用和清理。Python 上下文关闭语义参考 [rclpy Humble 初始化与关闭实现](https://github.com/ros2/rclpy/blob/humble/rclpy/rclpy/__init__.py)。
+
+## 2026-11-11 GitHub Actions 依赖安装修复
+
+用户提供的 Actions 截图显示，`Install and build` 在 APT 安装阶段以 100 退出：`libgoogle-glog-dev` 依赖的 `libunwind-dev` / `libunwind7-dev` 无法满足；尚未进入 C++ 编译。截图没有展开 APT 求解器输出，不能据此认定某个具体版本的软件包被锁定。
+
+CI 改用官方 `ros:humble-ros-base-jammy` 作业容器，保留 Ubuntu 22.04 与 Humble；移除宿主机上的 `setup-ros` 安装步骤，容器内先准备原安装脚本需要的 `sudo`，后续继续运行同一份安装、编译、测试和真实 Nav2 验收流程。容器的脚本默认 shell 明确设为 Bash。
+
+依据：[setup-ros 官方说明](https://github.com/ros-tooling/setup-ros#alternative-to-setup-ros)允许直接使用预装 ROS 的容器；[官方镜像清单](https://github.com/docker-library/official-images/blob/master/library/ros)提供该 Humble/Jammy 标签。此改动隔离宿主机预装依赖，不需要在用户的 Ubuntu 虚拟机中移除开发库。
+
+本机已检查工作流 YAML、步骤顺序和变更内容。本机 Docker Linux 引擎未运行，没有执行容器内 APT 安装或触发远程工作流；最终结果以提交新配置后触发的新一轮 Actions 为准。
