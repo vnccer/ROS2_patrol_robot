@@ -103,25 +103,7 @@ public:
       });
     incidents_=create_subscription<patrol_interfaces::msg::Incident>("patrol/incidents",50,
       [this](patrol_interfaces::msg::Incident::ConstSharedPtr m){
-        // 计数器+1
-        ++incident_received_count_;
-        RCLCPP_INFO(
-          get_logger(),
-          "received=%u id=%s priority=%d",
-          incident_received_count_,
-          m->id.c_str(),
-          m->priority
-        );
-        auto &q=m->target.pose.orientation;
-        double norm=q.x*q.x+q.y*q.y+q.z*q.z+q.w*q.w;
-        if(m->target.header.frame_id!=frame_ || !std::isfinite(norm) || std::abs(norm-1)>0.05) {
-          mission_->record("rejected","坐标系必须为map, 姿态四元数必须经过归一化",0,m->id); return;
-        }
-        patrol::Task t; t.id=m->id; t.priority=m->priority;
-        t.pose={m->target.pose.position.x,m->target.pose.position.y,
-          std::atan2(2*(q.w*q.z+q.x*q.y),1-2*(q.y*q.y+q.z*q.z))};
-        t.expires=m->ttl_sec; t.handling=m->handling_sec;
-        mission_->submit(t,wall_now());
+        on_incident(m);
       });
     pause_=create_service<std_srvs::srv::SetBool>("patrol/set_paused",
       [this](std_srvs::srv::SetBool::Request::SharedPtr req,std_srvs::srv::SetBool::Response::SharedPtr res){
@@ -185,10 +167,32 @@ private:
   int64_t life_request_id_{0};
   std::string frame_;
   bool healthy() const {return seen_odom_&&wall_now()-last_odom_<odom_timeout_;}
-  bool nav_ready() const {return life_active_&&wall_now()-life_reply_<3&&nav_->action_server_is_ready();}
-  
+  bool nav_ready() const {return life_active_&&wall_now()-life_reply_<3&&nav_->action_server_is_ready();} 
   // 计数器成员变量
   unsigned int incident_received_count_{0};
+  
+  // 报警处理提取成成员函数
+  void on_incident(patrol_interfaces::msg::Incident::ConstSharedPtr m) {
+    ++incident_received_count_;
+    RCLCPP_INFO(
+      get_logger(),
+      "received=%u id=%s priority=%d",
+      incident_received_count_,
+      m->id.c_str(),
+      m->priority
+    );
+    auto &q=m->target.pose.orientation;
+    double norm=q.x*q.x+q.y*q.y+q.z*q.z+q.w*q.w;
+    if(m->target.header.frame_id!=frame_ || !std::isfinite(norm) || std::abs(norm-1)>0.05) {
+      mission_->record("rejected","坐标系必须为map, 姿态四元数必须经过归一化",0,m->id); return;
+    }
+    patrol::Task t; t.id=m->id; t.priority=m->priority;
+    t.pose={m->target.pose.position.x,m->target.pose.position.y,
+      std::atan2(2*(q.w*q.z+q.x*q.y),1-2*(q.y*q.y+q.z*q.z))};
+    t.expires=m->ttl_sec; t.handling=m->handling_sec;
+    mission_->submit(t,wall_now());
+  }
+
   void publish_permit() {
     std_msgs::msg::Bool m; m.data=mission_->permit()&&healthy()&&nav_ready(); permit_->publish(m);
   }

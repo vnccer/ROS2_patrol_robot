@@ -28,8 +28,12 @@ target_include_directories(mission_manager PRIVATE include)
 ament_target_dependencies(mission_manager rclcpp rclcpp_action geometry_msgs std_srvs
   nav2_msgs nav_msgs std_msgs lifecycle_msgs patrol_interfaces)
 
+# 独立节点撰写
+add_executable(patrol_node src/patrol_node.cpp)
+ament_target_dependencies(patrol_node rclcpp patrol_interfaces)
+
 # 将程序安装到 ROS2 可以通过 ros2 run 找到的位置。
-install(TARGETS mission_manager
+install(TARGETS mission_manager patrol_node
   DESTINATION lib/${PROJECT_NAME}
 )
 install(DIRECTORY include/ DESTINATION include)
