@@ -2,9 +2,11 @@
 
 **基于 ROS2 的移动机器人自主巡检与事件响应系统**
 
-先运行整套系统，再通过改参数和注入事件理解它。目标环境是 **Ubuntu 22.04 + ROS2 Humble**；轻量模式适合 VMware，Gazebo 模式复用 TurtleBot3 Burger。
+先运行整套系统，再通过改参数和注入事件理解它。目标环境是 **Ubuntu 22.04 + ROS2 Humble**；当前训练与后续开发以 **真实 Nav2 + 轻量仿真**为主，适合 VMware。Gazebo 模式复用 TurtleBot3 Burger，作为可选后端。
 
-已实现：多点巡逻、事件优先队列、同级 FIFO、嵌套抢占、明确取消后再派发、处置计时、未完成巡逻恢复、进程内去重、排队 TTL、有限重试、导航/取消期限、暂停、故障锁存、速度看门狗、CSV 记录、指标汇总、网页控制台和测试入口。
+当前源码包含：多点巡逻、事件优先队列、同级 FIFO、嵌套抢占、明确取消后再派发、处置计时、未完成巡逻恢复、进程内去重、排队 TTL、有限重试、导航/取消期限、暂停、故障锁存、速度看门狗、CSV 记录、指标汇总、网页控制台和测试入口。具体运行证据见验证记录。
+
+**安全性与稳定性是完成 C++ 实践训练后的项目目标。** 后续将围绕任务区域防护、导航反馈失联、连续健康恢复、门禁旧指令失效、状态超时、审计和故障注入逐项补强；这些规划不列为当前已完成成果。
 
 | 模式 | 用途 | 导航与定位 |
 |---|---|---|
@@ -40,9 +42,22 @@ Nav2 + 任务管理器 + 网页/RViz
 | `src/patrol_bringup/config/nav2.yaml` | 基于上游 Humble 快照派生的导航参数 |
 | [基于ROS2的移动机器人自主巡检与事件响应系统](docs/基于ROS2的移动机器人自主巡检与事件响应系统.md) | 系统学习笔记：观察巡逻运行，理解节点、话题、服务和动作 |
 | [ROS2环境配置humble](docs/ROS2环境配置humble.md) | 当前 Humble 运行环境、安装与启动命令速查 |
+| [C++ 实践训练路线](docs/ROS2自主巡检项目_C++实践训练路线.md) | 当前任务 1～9：独立修改、写节点、撤销服务、反馈与调试交付 |
+| [安全性与稳定性开发路线](docs/ROS2自主巡检项目_安全性与稳定性开发路线.md) | 后续任务 10～18；任务 19 SROS2 选做，均按实际验收推进 |
 | [实验菜单](docs/EXPERIMENTS.md) | 改什么、出现什么效果、怎样验证 |
 | [设计与接口](docs/ARCHITECTURE.md) | 状态、话题、恢复和计时约定 |
 | [验证记录](docs/VALIDATION.md) | 已验证内容与待 Ubuntu 验证的边界 |
+
+## 1.1 开发阶段与后续目标
+
+| 阶段 | 要完成的内容 | 进入下一阶段的依据 |
+|---|---|---|
+| 理解与运行 | 观察系统，梳理 Topic、Service、Action、Timer 和业务调用链 | 学习笔记中的操作与记录 |
+| 当前 C++ 实践：任务 1～9 | 接收计数、观察节点、排队撤销、反馈、调试与回归 | 逐项代码、构建、运行与解释证据 |
+| 后期安全性与稳定性：任务 10～18 | 输入/配置边界、失联与恢复、运动保护、监控审计、故障验证和测量 | 正常、异常与回归结果及原始记录 |
+| 选做：任务 19 | 在明确通信范围内验证 SROS2 访问控制 | 授权成功、越权拒绝及业务校验对照 |
+
+先完成原训练，再冻结可复现基线并进入任务 10；不同时展开全部模块。现有基础保护继续复用，源码已有机制、自己的新增实现和实际验收结果分别记录。软件仿真中的零速度与停车测试不等于真机功能安全认证。
 
 # 二、运行操作
 
@@ -103,7 +118,7 @@ bash scripts/run.sh backend:=gazebo gui:=false
 
 `gui:=false` 保留物理仿真，只关闭 Gazebo 三维窗口；需要三维画面改为 `gui:=true`。此路径面向 Humble/Gazebo Classic。
 
-安装或启动报错时，按第三部分“踩坑”中的对应报错修复。
+安装或启动报错时，查阅 [rosdep 网络恢复](docs/ROSDEP_NETWORK.md) 和 [启动入口排障](docs/LAUNCH_TROUBLESHOOTING.md)。
 
 ### 2.2.2 ROS2 命令操控
 
@@ -132,121 +147,9 @@ colcon test-result --verbose
 
 ROS 记录默认位于 `~/.ros/patrol_runs/`，预览记录位于 `preview_runs/`。`python3 tools/report_metrics.py records.csv` 汇总派发/到达延迟、完成比例、过期和失败。复用出处、源码快照和许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
-# 三、踩坑
+# 三、知识图谱
 
-以下记录 2026-11-02 安装和启动中遇到的三个问题。按对应报错选择操作，命令均在 Ubuntu 终端执行；遇到新的错误先停在该步骤。
-
-## 3.1 rosdep init 下载 GitHub 文件时连接重置
-
-报错示例：
-
-```text
-ERROR: cannot download default sources list from:
-https://raw.githubusercontent.com/ros/rosdistro/master/rosdep/sources.list.d/20-default.list
-Connection reset by peer
-```
-
-失败发生在依赖数据库初始化阶段，前面的 `fontconfig/libc-bin/man-db` 触发器是正常安装输出。已经完成的 apt 安装可以保留。
-
-将更新后的 `scripts/setup_ubuntu.sh` 同步到 Ubuntu 同名文件，然后切换到镜像模式继续：
-
-```bash
-cd ~/patrol_robot_ws
-bash scripts/setup_ubuntu.sh --rosdep-mirror
-```
-
-需要 Gazebo 则使用：
-
-```bash
-bash scripts/setup_ubuntu.sh --rosdep-mirror --gazebo
-```
-
-镜像模式同时替换 rosdep 规则地址和 `ROSDISTRO_INDEX_URL`，并保留配置备份。成功标志是规则与 Humble 索引更新完成，末尾没有 `ERROR`，脚本继续到依赖检查和构建。若不方便同步脚本，[网络恢复说明](docs/ROSDEP_NETWORK.md) 中也提供了手动初始化命令。
-
-## 3.2 Humble 已更新，但 fuerte.yaml 下载失败
-
-报错示例：
-
-```text
-Add distro "humble"
-updated cache in /home/donk/.ros/rosdep/sources.cache
-ERROR: unable to process source [.../releases/fuerte.yaml]
-ERROR: Not all sources were able to be updated.
-```
-
-默认来源列表保留了旧 ROS1 Fuerte 的 `gbpdistro` 条目，本项目不需要它。`--rosdistro humble` 会过滤发行版索引，但仍会读取这个独立来源。仅看到 `updated cache` 还不能认定更新完整成功。
-
-直接备份并注释该条目，再更新；无需重新复制工程：
-
-```bash
-sudo sed -i.before-fuerte-fix -E \
-  '/^[[:space:]]*gbpdistro[[:space:]].*fuerte[.]yaml([[:space:]]|$)/s/^/# Disabled for Humble: /' \
-  /etc/ros/rosdep/sources.list.d/20-default.list
-
-export ROSDISTRO_INDEX_URL=https://mirrors.ustc.edu.cn/rosdistro/index-v4.yaml
-rosdep update --rosdistro humble
-```
-
-第一条命令留下 `.before-fuerte-fix` 备份。确认更新结束没有 `ERROR`，再继续原安装脚本：
-
-```bash
-cd ~/patrol_robot_ws
-bash scripts/setup_ubuntu.sh --rosdep-mirror
-```
-
-需要 Gazebo 时加 `--gazebo`。更新使用普通用户，运行 `rosdep update` 不要加 `sudo`。新版安装脚本会自动备份并注释该旧条目；现有脚本也会保留上述手动注释。
-
-## 3.3 启动时报 lightweight_sim executable not found
-
-报错示例：
-
-```text
-executable 'lightweight_sim' not found on the libexec directory
-'/home/donk/patrol_robot_ws/install/patrol_sim/lib/patrol_sim'
-```
-
-包已被找到，但启动脚本未被识别为可执行文件。旧交付 ZIP 中三个 Python 入口缺少 Linux 执行位，`--symlink-install` 创建的符号链接不会补上目标文件的执行权限。
-
-为三个入口统一补权限，只重建 `patrol_sim`，无需重装依赖或重新复制工程：
-
-```bash
-cd ~/patrol_robot_ws
-source /opt/ros/humble/setup.bash
-
-chmod +x src/patrol_sim/scripts/{lightweight_sim,velocity_guard,control_panel}
-colcon build --packages-select patrol_sim --symlink-install
-source install/setup.bash
-
-ros2 pkg executables patrol_sim
-```
-
-构建应成功，最后一条命令应列出以下三项（顺序可以不同）：
-
-```text
-patrol_sim control_panel
-patrol_sim lightweight_sim
-patrol_sim velocity_guard
-```
-
-确认入口齐全后启动：
-
-```bash
-bash scripts/run.sh
-```
-
-如果仍未列出入口，查看安装结果与符号链接：
-
-```bash
-ls -l install/patrol_sim/lib/patrol_sim/
-```
-
-新版 CMake 会在构建目录生成有执行权限的入口副本，新的 ZIP 也保留脚本执行位。上述检查仅确认入口可识别，Nav2 和仿真的运行结果仍需继续观察。
-
-详细依据与说明：[rosdep 网络恢复](docs/ROSDEP_NETWORK.md)、[启动入口权限修复](docs/LAUNCH_TROUBLESHOOTING.md)。
-
-# 四、知识图谱
-
-## 4.1 项目知识图谱
+## 3.1 项目知识图谱
 
 这张图将整个项目划分为六个模块。先理解模块之间的关系，再学习每个模块内部的知识。
 
@@ -254,7 +157,7 @@ ls -l install/patrol_sim/lib/patrol_sim/
 
 <img src="docs/images/项目知识图谱.svg" alt="ROS2 自主巡检机器人知识图谱" width="340" height="442" style="width: 340px; max-width: 100%; height: auto; zoom: 130%;">
 
-## 4.2 新概念逐行解释
+## 3.2 新概念逐行解释
 
 ### 1. ROS2 基础与通信
 
