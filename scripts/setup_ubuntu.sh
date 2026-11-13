@@ -44,7 +44,7 @@ if [[ "${ID}" != ubuntu || "${VERSION_ID}" != 22.04 ]]; then
   exit 1
 fi
 if [[ ! -f /opt/ros/humble/setup.bash ]]; then
-  echo 'Install ROS2 Humble first: docs/ENVIRONMENT.md' >&2
+  echo 'Install ROS2 Humble first: docs/环境与工具/ENVIRONMENT.md' >&2
   exit 1
 fi
 sudo apt-get update

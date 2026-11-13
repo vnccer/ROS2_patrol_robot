@@ -32,6 +32,8 @@ Nav2 + 任务管理器 + 网页/RViz
 
 `mission.hpp` 定义任务规则；`mission_node.cpp` 把 ROS 回调接到规则上。高优先级事件到达后，先禁止运动并取消旧目标，收到旧目标终结结果才发新目标。巡逻索引仅在到达并停留完成后前进，因而能恢复未完成巡逻。事件处置目前是模拟停留。
 
+文档按用途分类，完整目录见 [文档索引](docs/README.md)。
+
 | 入口 | 作用 |
 |---|---|
 | `src/patrol_interfaces/msg/Incident.msg` | 事件 ID、优先级、目标、TTL 和处置时间 |
@@ -40,13 +42,13 @@ Nav2 + 任务管理器 + 网页/RViz
 | `src/patrol_sim/patrol_sim/` | 仿真、速度保护、网页接口 |
 | `src/patrol_bringup/config/mission.yaml` | 巡逻与任务参数，适合从这里改起 |
 | `src/patrol_bringup/config/nav2.yaml` | 基于上游 Humble 快照派生的导航参数 |
-| [基于ROS2的移动机器人自主巡检与事件响应系统](docs/基于ROS2的移动机器人自主巡检与事件响应系统.md) | 系统学习笔记：观察巡逻运行，理解节点、话题、服务和动作 |
-| [ROS2环境配置humble](docs/ROS2环境配置humble.md) | 当前 Humble 运行环境、安装与启动命令速查 |
-| [C++ 实践训练路线](docs/ROS2自主巡检项目_C++实践训练路线.md) | 当前任务 1～9：独立修改、写节点、撤销服务、反馈与调试交付 |
-| [安全性与稳定性开发路线](docs/ROS2自主巡检项目_安全性与稳定性开发路线.md) | 后续任务 10～18；任务 19 SROS2 选做，均按实际验收推进 |
-| [实验菜单](docs/EXPERIMENTS.md) | 改什么、出现什么效果、怎样验证 |
-| [设计与接口](docs/ARCHITECTURE.md) | 状态、话题、恢复和计时约定 |
-| [验证记录](docs/VALIDATION.md) | 已验证内容与待 Ubuntu 验证的边界 |
+| [开发笔记](docs/开发笔记/ROS2自主巡检项目_开发笔记.md) | 任务思路、源码入口、操作验证与练习记录 |
+| [ROS2环境配置humble](docs/环境与工具/ROS2环境配置humble.md) | 当前 Humble 运行环境、安装与启动命令速查 |
+| [C++ 实践训练路线](docs/设计与路线/ROS2自主巡检项目_C++实践训练路线.md) | 当前任务 1～9：独立修改、写节点、撤销服务、反馈与调试交付 |
+| [安全性与稳定性开发路线](docs/设计与路线/ROS2自主巡检项目_安全性与稳定性开发路线.md) | 后续任务 10～18；任务 19 SROS2 选做，均按实际验收推进 |
+| [实验菜单](docs/实验与验证/EXPERIMENTS.md) | 改什么、出现什么效果、怎样验证 |
+| [设计与接口](docs/设计与路线/ARCHITECTURE.md) | 状态、话题、恢复和计时约定 |
+| [验证记录](docs/实验与验证/VALIDATION.md) | 已验证内容与待 Ubuntu 验证的边界 |
 
 ## 1.1 开发阶段与后续目标
 
@@ -77,7 +79,7 @@ python tools\desktop_demo.py
 
 ### 2.2.1 安装与启动
 
-先按 [Humble 环境说明](docs/ENVIRONMENT.md) 安装 Ubuntu 22.04 和 ROS2 Humble。将**整个 `patrol_robot_ws` 目录**复制到 Ubuntu（不只复制 `src`）。以下使用当前实际路径 `~/patrol_robot_ws`；目录不同则相应替换。不用复制 Windows 产物、`.cache`、`build/install/log`。
+先按 [Humble 环境说明](docs/环境与工具/ENVIRONMENT.md) 安装 Ubuntu 22.04 和 ROS2 Humble。将**整个 `patrol_robot_ws` 目录**复制到 Ubuntu（不只复制 `src`）。以下使用当前实际路径 `~/patrol_robot_ws`；目录不同则相应替换。不用复制 Windows 产物、`.cache`、`build/install/log`。
 
 ```bash
 cd ~/patrol_robot_ws
@@ -118,7 +120,7 @@ bash scripts/run.sh backend:=gazebo gui:=false
 
 `gui:=false` 保留物理仿真，只关闭 Gazebo 三维窗口；需要三维画面改为 `gui:=true`。此路径面向 Humble/Gazebo Classic。
 
-安装或启动报错时，查阅 [rosdep 网络恢复](docs/ROSDEP_NETWORK.md) 和 [启动入口排障](docs/LAUNCH_TROUBLESHOOTING.md)。
+安装或启动报错时，查阅 [rosdep 网络恢复](docs/故障排查/ROSDEP_NETWORK.md) 和 [启动入口排障](docs/故障排查/LAUNCH_TROUBLESHOOTING.md)。
 
 ### 2.2.2 ROS2 命令操控
 

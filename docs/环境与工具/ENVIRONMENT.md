@@ -1,6 +1,6 @@
 # 当前项目运行环境
 
-当前项目使用 Windows + VMware + Ubuntu 22.04 + ROS2 Humble。Windows 本机预览与 Ubuntu 完整 ROS2 系统的区别、启动命令和操作方式统一见 [README](../README.md)。
+当前项目使用 Windows + VMware + Ubuntu 22.04 + ROS2 Humble。Windows 本机预览与 Ubuntu 完整 ROS2 系统的区别、启动命令和操作方式统一见 [README](../../README.md)。
 
 如果已经安装 Humble，直接从第 3 节准备本项目；无需重装 ROS。
 
@@ -78,8 +78,8 @@ bash scripts/setup_ubuntu.sh --rosdep-mirror --gazebo
 bash scripts/run.sh backend:=gazebo gui:=false
 ```
 
-网页控制台在 Ubuntu 浏览器打开 `http://127.0.0.1:8765`。具体实验见 [EXPERIMENTS.md](EXPERIMENTS.md)，已遇到的问题见 [rosdep 网络恢复](ROSDEP_NETWORK.md) 与 [启动入口排障](LAUNCH_TROUBLESHOOTING.md)。
+网页控制台在 Ubuntu 浏览器打开 `http://127.0.0.1:8765`。具体实验见 [EXPERIMENTS.md](../实验与验证/EXPERIMENTS.md)，已遇到的问题见 [rosdep 网络恢复](../故障排查/ROSDEP_NETWORK.md) 与 [启动入口排障](../故障排查/LAUNCH_TROUBLESHOOTING.md)。
 
-当前 [C++ 实践训练](ROS2自主巡检项目_C++实践训练路线.md) 和后期 [安全性与稳定性开发](ROS2自主巡检项目_安全性与稳定性开发路线.md) 均以真实 Nav2 + 轻量底盘为主，不要求安装 Gazebo 或接真机。SROS2 是后期选做实验，届时单独核实 RMW 和安全材料；完成环境安装不代表后续功能已经实现或验收。
+当前 [C++ 实践训练](../设计与路线/ROS2自主巡检项目_C++实践训练路线.md) 和后期 [安全性与稳定性开发](../设计与路线/ROS2自主巡检项目_安全性与稳定性开发路线.md) 均以真实 Nav2 + 轻量底盘为主，不要求安装 Gazebo 或接真机。SROS2 是后期选做实验，届时单独核实 RMW 和安全材料；完成环境安装不代表后续功能已经实现或验收。
 
-依据：[Humble 官方 Ubuntu 安装说明](https://github.com/ros2/ros2_documentation/blob/humble/source/Installation/Ubuntu-Install-Debs.rst)、[官方软件源配置步骤](https://github.com/ros2/ros2_documentation/blob/humble/source/Installation/_Apt-Repositories.rst)。本机静态检查和 Ubuntu 实际验收的边界见 [VALIDATION.md](VALIDATION.md)。
+依据：[Humble 官方 Ubuntu 安装说明](https://github.com/ros2/ros2_documentation/blob/humble/source/Installation/Ubuntu-Install-Debs.rst)、[官方软件源配置步骤](https://github.com/ros2/ros2_documentation/blob/humble/source/Installation/_Apt-Repositories.rst)。本机静态检查和 Ubuntu 实际验收的边界见 [VALIDATION.md](../实验与验证/VALIDATION.md)。

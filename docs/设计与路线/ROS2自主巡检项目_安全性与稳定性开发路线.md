@@ -51,7 +51,7 @@
 
 这些是本次工作区快照，不是对你在 Ubuntu 中实际练习进度的判断。两处内容不一致时先同步、构建并验证。原训练路线中的所有复选框仍按实际验收记录维护。
 
-**本次没有修改项目源码，没有执行 Ubuntu/ROS2/Nav2 运行验收。** 原有 Windows 检查与后续修复记录见 [VALIDATION.md](VALIDATION.md)，不能据本文更新日期推定已重新测试系统。
+**本次没有修改项目源码，没有执行 Ubuntu/ROS2/Nav2 运行验收。** 原有 Windows 检查与后续修复记录见 [VALIDATION.md](../实验与验证/VALIDATION.md)，不能据本文更新日期推定已重新测试系统。
 
 ### 2.2 已有机制与真正新增的内容
 
@@ -86,8 +86,8 @@
 ```text
 Windows 项目根目录：D:\4work\3project\ROS2_patrol_robot
 Windows 源码编辑目录：D:\4work\3project\ROS2_patrol_robot\src
-原路线：docs\ROS2自主巡检项目_C++实践训练路线.md
-本文位置：docs\ROS2自主巡检项目_安全性与稳定性开发路线.md
+原路线：docs\设计与路线\ROS2自主巡检项目_C++实践训练路线.md
+本文位置：docs\设计与路线\ROS2自主巡检项目_安全性与稳定性开发路线.md
 Ubuntu 工程根目录：（填写实际路径，例如 ~/patrol_robot_ws）
 实际编辑位置：（Windows 编辑后同步，或 Ubuntu 直接编辑）
 同步方式：（填写）
@@ -431,7 +431,7 @@ Humble 的 `NavigateToPose` 反馈包含 `distance_remaining` 等字段，但反
 - `src/patrol_manager/src/mission_node.cpp`、`src/patrol_manager/include/patrol_manager/mission.hpp`（当前存在；实施前复核）。
 - `src/patrol_sim/patrol_sim/guard.py`、`src/patrol_manager/src/patrol_node.cpp`（当前存在；实施前复核）：各自模块事件。
 - `src/patrol_interfaces/msg/TaskRecord.msg`、`tools/report_metrics.py`、`tests/test_metrics.py`（当前存在；实施前复核）：优先兼容；改接口时须同步全部使用方。
-- `docs/security_event_schema.md`（拟新增；需核实）：字段、原因标识、关联规则与版本。
+- `docs/设计与路线/security_event_schema.md`（拟新增；需核实）：字段、原因标识、关联规则与版本。
 
 **开发提示**
 
@@ -534,7 +534,7 @@ Humble 的 `NavigateToPose` 反馈包含 `distance_remaining` 等字段，但反
 
 - `tools/report_metrics.py`、`tests/test_metrics.py`（当前存在；实施前复核）：仅在兼容扩展合适时复用。
 - `tools/report_security_metrics.py`（拟新增；需核实）：如需新脚本，明确输入 schema 与缺失值处理。
-- `docs/security_validation.md`、`docs/security_demo.md`（拟新增；需核实）。
+- `docs/实验与验证/security_validation.md`、`docs/实验与验证/security_demo.md`（拟新增；需核实）。
 - `test_results/security/`（拟新增目录；需核实）：逐次记录与汇总，避免只留截图。
 
 **开发提示**
@@ -809,4 +809,4 @@ python3 tools/ros_acceptance.py
 
 **推进顺序：继续完成并验收原任务 1～9 → 冻结基线并执行第 3.2 节准入检查 → 从任务 10 开始逐项实现。安全性与稳定性作为后期目标，完成情况始终以代码和验收记录为准。**
 
-相关入口：[README](../README.md) · [设计与接口](ARCHITECTURE.md) · [实验菜单](EXPERIMENTS.md) · [验证记录](VALIDATION.md) · [系统学习笔记](基于ROS2的移动机器人自主巡检与事件响应系统.md)。
+相关入口：[README](../../README.md) · [设计与接口](ARCHITECTURE.md) · [实验菜单](../实验与验证/EXPERIMENTS.md) · [验证记录](../实验与验证/VALIDATION.md) · [开发笔记](../开发笔记/ROS2自主巡检项目_开发笔记.md)。

@@ -44,7 +44,7 @@
 
 ```text
 D:\4work\3project\ROS2_patrol_robot\
-├── docs\ROS2自主巡检项目_C++实践训练路线.md
+├── docs\设计与路线\ROS2自主巡检项目_C++实践训练路线.md
 ├── src\
 ├── scripts\
 ├── tools\
@@ -58,7 +58,7 @@ D:\4work\3project\ROS2_patrol_robot\
 ```text
 Windows 项目根目录：D:\4work\3project\ROS2_patrol_robot
 Windows 源码编辑目录：D:\4work\3project\ROS2_patrol_robot\src
-本文位置：D:\4work\3project\ROS2_patrol_robot\docs\ROS2自主巡检项目_C++实践训练路线.md
+本文位置：D:\4work\3project\ROS2_patrol_robot\docs\设计与路线\ROS2自主巡检项目_C++实践训练路线.md
 Ubuntu 工程根目录：（填写实际路径，例如 ~/patrol_robot_ws）
 实际源码编辑位置：（Windows 编辑后同步，或直接在 Ubuntu 编辑）
 同步方式（如需要）：
