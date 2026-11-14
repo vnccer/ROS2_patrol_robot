@@ -44,12 +44,11 @@ public:
         std_srvs::srv::Trigger::Request::SharedPtr,
         std_srvs::srv::Trigger::Response::SharedPtr response)
       {
-        status_receied_count_ = 0;
+        status_received_count_ = 0;
         response->success = true;
         response->message = "Status received reset.";
       }
     );
-
 
   }
 

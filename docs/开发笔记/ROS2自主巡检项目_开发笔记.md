@@ -166,6 +166,37 @@ ros2 service call /patrol/monitor/reset_count std_srvs/srv/Trigger '{}'
 
 通过标准：返回 `success: true`，摘要计数从清零后重新累计，状态缓存保留。状态消息持续到达时，下一条摘要的计数可能已经大于 0。
 
+```BASH
+# 终端A
+[mission_manager-12] [INFO] [1794626542.528933603] [mission_manager]: dispatched patrol/0 
+[bt_navigator-9] [WARN] [1794626557.652431372] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
+[controller_server-5] [WARN] [1794626557.805544957] [controller_server]: Control loop missed its desired rate of 10.0000Hz
+[bt_navigator-9] [WARN] [1794626557.810058615] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
+[mission_manager-12] [INFO] [1794626569.828266061] [mission_manager]: arrived patrol/0 
+
+# 终端B
+[INFO] [1794626514.783854325] [patrol_node]: received=1125 state=WAITING
+[INFO] [1794626514.832433772] [patrol_node]: received=1126 state=PATROLLING
+[INFO] [1794626541.478947265] [patrol_node]: received=517 state=DWELLING
+[INFO] [1794626542.478692320] [patrol_node]: received=537 state=WAITING
+
+# 终端C
+data: state=PATROLLING active_id=patrol/3 queue_size=0 received=1131
+---
+data: state=PATROLLING active_id=patrol/3 queue_size=0 received=9
+---
+data: state=PATROLLING active_id=patrol/3 queue_size=0 received=29
+
+# 终端D
+donk@ubuntu:~/ROS2_patrol_robot$ ros2 service call /patrol/monitor/reset_count std_srvs/srv/Trigger '{}'
+requester: making request: std_srvs.srv.Trigger_Request()
+
+response:
+std_srvs.srv.Trigger_Response(success=True, message='Status received reset.')
+```
+
+
+
 
 
 我已经按照要求，配置好了autodl中的云服务器，接下来交给你配置好，然后继续跑上次的实验，我希望你能让autodl中的云服务器自己跑程序，因为这次autodl中的云服务器会保留15天的数据，这样就不会受到我自己电脑断网的影响，但数据下载到本地像之前那样也要同步进行（大概率不会断网，所以ssh连接大概率稳固）。
