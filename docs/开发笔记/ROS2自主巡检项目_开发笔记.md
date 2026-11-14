@@ -9,6 +9,9 @@ cd ~/ROS2_patrol_robot
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 
+# 刚刚clone项目时，先完整编译一遍
+colcon build --symlink-install
+
 # 修改源码后执行
 colcon build --packages-select patrol_manager --symlink-install
 source install/setup.bash
@@ -80,7 +83,7 @@ ros2 topic pub --once /patrol/incidents patrol_interfaces/msg/Incident \
 
 ## 任务 3：系统状态订阅
 
-**输入：** `/patrol/status` 上的 `MissionStatus` 消息。
+**输入：** `/patrol/status` 上的 `MissionStatus` 消息。（相当于抄下公文通通知）
 
 **处理：** 在 [patrol_node.cpp](D:/4work/3project/ROS2_patrol_robot/src/patrol_manager/src/patrol_node.cpp) 的 `on_status()` 中累加计数、保存最新消息，并比较状态名是否变化。
 
@@ -106,7 +109,7 @@ ros2 service call /patrol/set_paused std_srvs/srv/SetBool '{data: false}'
 
 ## 任务 4：定时摘要发布
 
-**输入：** 最新缓存的状态消息、累计接收数，以及每秒一次的定时触发。
+**输入：** 最新缓存的状态消息、累计接收数，以及每秒一次的定时触发。（相当于把公文通通知挑几个重点，建小群再发消息）
 
 **处理：** 在 [patrol_node.cpp](D:/4work/3project/ROS2_patrol_robot/src/patrol_manager/src/patrol_node.cpp) 中构造摘要；未收到过状态时使用 `NO_STATUS`，收到后读取缓存字段。
 
@@ -162,3 +165,7 @@ ros2 service call /patrol/monitor/reset_count std_srvs/srv/Trigger '{}'
 ```
 
 通过标准：返回 `success: true`，摘要计数从清零后重新累计，状态缓存保留。状态消息持续到达时，下一条摘要的计数可能已经大于 0。
+
+
+
+我已经按照要求，配置好了autodl中的云服务器，接下来交给你配置好，然后继续跑上次的实验，我希望你能让autodl中的云服务器自己跑程序，因为这次autodl中的云服务器会保留15天的数据，这样就不会受到我自己电脑断网的影响，但数据下载到本地像之前那样也要同步进行（大概率不会断网，所以ssh连接大概率稳固）。

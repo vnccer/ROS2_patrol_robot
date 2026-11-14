@@ -30,10 +30,17 @@ ament_target_dependencies(mission_manager rclcpp rclcpp_action geometry_msgs std
 
 # 独立节点撰写
 add_executable(patrol_node src/patrol_node.cpp)
-ament_target_dependencies(patrol_node rclcpp patrol_interfaces std_msgs)
+ament_target_dependencies(
+  patrol_node 
+  rclcpp 
+  patrol_interfaces 
+  std_msgs
+  std_srvs
+  )
 # rclcpp 使用ROS2 C++节点、发布器、定时器等
 # patrol_interfaces 使用自定义的MissionStatus消息类型
 # std_msgs 使用标准的ROS2消息类型，例如String
+# std_srvs 使用标准的ROS2服务类型，例如Trigger
 
 # 将程序安装到 ROS2 可以通过 ros2 run 找到的位置。
 install(TARGETS mission_manager patrol_node
