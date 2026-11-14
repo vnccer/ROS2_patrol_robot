@@ -65,6 +65,51 @@ int main() {
       m.cfg.max_queue=1;m.submit(event("full1"),0);check(!m.submit(event("full2"),0),"bounded queue");}
     {auto m=make();m.cfg.max_ids=1;m.submit(event("one"),0);
       check(!m.submit(event("two"),1),"bounded process-lifetime dedup history");}
+    // 验证空队列取消报警
+    {auto m=make();
+      check(!m.cancel_pending("missing"),"empty queue cancellation returns false");
+      check(m.queue.empty(),"empty queue remains empty");}
+    // 验证不存在的ID、删除中间任务、撤销记录、去重与剩余任务顺序
+    {auto m=make();m.submit(event("a",20),0);m.submit(event("b",80),0);m.submit(event("c",20),0);
+      check(!m.cancel_pending("missing"),"unknown ID returns false");
+      check(m.queue.size()==3 && m.queue[0].id=="a" && m.queue[1].id=="b" && m.queue[2].id=="c","unkown ID preserves queue");
+      // 清理掉前面接收报警产生的记录，单独检查撤销记录
+      m.drain();
+      check(m.cancel_pending("b"),"cancel middle pending event");
+      check(m.queue.size()==2 && m.queue[0].id=="a" && m.queue[1].id=="c","remaining queue order is preserved");
+      auto effects = m.drain();
+      check(effects.size()==1 && effects[0].kind==patrol::Effect::Record && effects[0].name=="pending_cancelled" && effects[0].task.id=="b","cancellation record has correct type and ID");
+      check(!m.submit(event("b"),1),"cancelled ID remains deduplicated");
+      m.tick(1);
+      check(m.active && m.active->id=="a","first remaining event dispatches first");
+      m.result(m.token,true,2);
+      m.tick(3);
+      m.tick(3.1);
+      check(m.active && m.active->id=="c","equal priority FIFO survives cancellation");
+    }
+    // 验证活动任务不受影响
+    {auto m=make();m.submit(event("running",80),0);m.submit(event("waiting",20),0);m.tick(0);
+      const auto old_token=m.token;
+      check(!m.cancel_pending("running"),"active event cannot be cancelled as pending");
+      check(m.queue.size()==1&&m.queue[0].id=="waiting","active ID request preserves pending queue");
+      // 清掉旧效果，单独检查撤销 waiting 的结果。
+      m.drain();check(m.cancel_pending("waiting"),"pending event can be cancelled during navigation");
+      check(m.queue.empty(),"cancelled pending event is removed");
+      check(m.active&&m.active->id=="running"&&m.flying&&!m.cancelling&&m.token==old_token,"active navigation remains unchanged");
+      auto effects=m.drain();
+      check(effects.size()==1&&effects[0].kind==patrol::Effect::Record&&effects[0].name=="pending_cancelled"&&effects[0].task.id=="waiting","pending cancellation emits only its record");}
+    // 验证“被抢占后重新排队的报警”也可以撤销
+    {auto m=make();m.submit(event("low",20),0);m.tick(0);const auto interrupted_token=m.token;
+      m.submit(event("urgent",80),1);m.tick(1);
+      check(m.cancelling,"urgent event starts preemption");
+      // 模拟旧导航终结：low 重新入队，再派发 urgent。
+      m.result(interrupted_token,false,1.1);m.tick(1.2);
+      check(m.active&&m.active->id=="urgent"&&m.queue.size()==1&&m.queue[0].id=="low","interrupted event is back in pending queue");
+      const auto urgent_token=m.token;
+      m.drain();check(m.cancel_pending("low"),"interrupted pending event can be cancelled");
+      check(m.queue.empty()&&m.active&&m.active->id=="urgent"&&m.flying&&!m.cancelling&&m.token==urgent_token,"urgent navigation continues after pending removal");
+      auto effects=m.drain();
+      check(effects.size()==1&&effects[0].kind==patrol::Effect::Record&&effects[0].name=="pending_cancelled"&&effects[0].task.id=="low","interrupted pending cancellation records the correct ID");}
     std::cout<<"PASS: "<<checks<<" mission invariants\n";return 0;
   } catch(const std::exception &e) {std::cerr<<"FAIL: "<<e.what()<<'\n';return 1;}
 }

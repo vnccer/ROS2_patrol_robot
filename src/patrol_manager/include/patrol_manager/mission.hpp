@@ -75,6 +75,18 @@ public:
     t.order=++sequence; queue.push_back(t); record("accepted","",0,t.id);
     return true;
   }
+  // 撤销队列中的报警
+  bool cancel_pending(const std::string &id) { 
+    for (auto it = queue.begin(); it != queue.end(); ++it) {
+      if (it->id == id) {
+        const std::string cancelled_id = it->id;
+        queue.erase(it);
+        record("pending_cancelled", "", 0, cancelled_id);
+        return true;
+      }
+    }
+    return false;
+  }
   void pause(bool value, double now) {
     if (value==paused) return;
     paused=value; record(value ? "paused" : "resumed");
