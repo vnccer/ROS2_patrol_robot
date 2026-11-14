@@ -19,21 +19,21 @@ public:
       "/patrol/status", 10,
       [this](patrol_interfaces::msg::MissionStatus::ConstSharedPtr m)
       {
-        on_status(m); // 调用刚刚写好的private中的状态订阅成员函数，把m传进入
+        on_status(m);
       }
     );
 
     // 创建摘要发布器
     summary_pub_ = this->create_publisher<std_msgs::msg::String>(
-      "/patrol/summary", 10 //指定了向/patrol/summary主题发布消息，队列长度为10
+      "/patrol/summary", 10
     );
 
     // 创建定时器
-    summary_timer_ = this->create_wall_timer( // this表示当前的PatrolNode对象，create_wall_timer是ROS2的定时器函数
-      std::chrono::seconds(1), // C++标准库::时间相关功能::秒类型(1s)
+    summary_timer_ = this->create_wall_timer(
+      std::chrono::seconds(1),
       [this]()
       {
-        publish_summary(); // 到时间后调用publish_summary函数
+        publish_summary();
       }
     );
 
@@ -41,8 +41,9 @@ public:
     reset_count_service_ = this->create_service<std_srvs::srv::Trigger>(
       "/patrol/monitor/reset_count",
       [this](
-        std_srvs::srv::Trigger::Request::SharedPtr,
-        std_srvs::srv::Trigger::Response::SharedPtr response)
+        std_srvs::srv::Trigger::Request::SharedPtr, // 指向请求对象的共享指针（该服务没有要读取的参数，故省略参数名）
+        std_srvs::srv::Trigger::Response::SharedPtr response // 指向响应对象的共享指针
+      )
       {
         status_received_count_ = 0;
         response->success = true;
@@ -62,7 +63,7 @@ private:
   patrol_interfaces::msg::MissionStatus::ConstSharedPtr last_status_; // 保存上一次的完整状态消息
   bool has_status_{false}; // 是否已经收到过状态消息
 
-  // 状态回调函数，处理收到的状态消息，累加计数、保存最新消息、比较状态名是否变化，若变化则打印received和state
+  // 状态回调函数
   void on_status(patrol_interfaces::msg::MissionStatus::ConstSharedPtr m) {
     ++status_received_count_;
     last_status_ = m;
@@ -81,7 +82,7 @@ private:
     }
   }
 
-  // 定时器回调函数，用于发布状态摘要
+  // 定时器回调函数
   void publish_summary(){
     std_msgs::msg::String msg; // 先准备一个空的消息对象，其中有字段data用于保存字符串
     if (!has_status_){
@@ -96,7 +97,7 @@ private:
     summary_pub_->publish(msg); // 让summary_pub_指向的发布器调用它的publish函数，发布msg消息
   }
 
-}; // 整个class类结束，需要分号闭合
+}; // PatrolNode class类结束
 
 int main(int argc, char **argv)
 {
