@@ -20,6 +20,7 @@
 #include "patrol_interfaces/msg/incident.hpp"
 #include "patrol_interfaces/msg/mission_status.hpp"
 #include "patrol_interfaces/msg/task_record.hpp"
+#include "patrol_interfaces/srv/cancel_pending.hpp"
 
 // 三个using让后面的写法更简短
 using namespace std::chrono_literals; // 允许写50ms
@@ -110,6 +111,16 @@ public:
         mission_->pause(req->data,wall_now()); publish_permit();
         res->success=true; res->message="Pause updated; status confirms navigation cancellation.";
       });
+    // 增加用于撤销队列中报警的服务
+    cancel_pending_service_ = create_service<patrol_interfaces::srv::CancelPending>("patrol/cancel_pending",
+      [this](
+        patrol_interfaces::srv::CancelPending::Request::SharedPtr req,
+        patrol_interfaces::srv::CancelPending::Response::SharedPtr res)
+        {
+          res->success = mission_->cancel_pending(req->id);
+          res->message = res->success ? "Pending incident cancelled." : "ID not found in pendingqueue.";
+        }
+      );
     estop_=create_service<std_srvs::srv::Trigger>("patrol/emergency_stop",
       [this](std_srvs::srv::Trigger::Request::SharedPtr,std_srvs::srv::Trigger::Response::SharedPtr res){
         mission_->trip("operator emergency stop",wall_now()); publish_permit();
@@ -159,6 +170,8 @@ private:
   rclcpp::Subscription<patrol_interfaces::msg::Incident>::SharedPtr incidents_;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr pause_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr estop_,recover_,shutdown_;
+  // 增加用于撤销队列中报警的服务
+  rclcpp::Service<patrol_interfaces::srv::CancelPending>::SharedPtr cancel_pending_service_;
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr parameters_;
   rclcpp::TimerBase::SharedPtr timer_;
   std::ofstream log_;

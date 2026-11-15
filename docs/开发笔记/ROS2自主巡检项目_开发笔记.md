@@ -194,3 +194,31 @@ std_srvs.srv.Trigger_Response(success=True, message='Status received reset.')
 
 ### 任务 6：业务层实现撤销
 
+**输入：** 要撤销的排队报警 ID。
+
+**处理：** 在 [mission.hpp](D:/4work/3project/ROS2_patrol_robot/src/patrol_manager/include/patrol_manager/mission.hpp) 的 `cancel_pending()` 中遍历 `queue`，找到后删除并记录 `pending_cancelled`；保留 `active`、其他任务顺序及 `known` 去重历史。
+
+**输出：** 删除成功返回 `true`，找不到返回 `false`；撤销记录携带对应报警 ID。
+
+**怎么验证成功：** 在 [test_mission.cpp](D:/4work/3project/ROS2_patrol_robot/src/patrol_manager/test/test_mission.cpp) 中直接调用业务函数，覆盖空队列、未知 ID、中间删除、记录与去重、剩余任务顺序、活动任务保护及被抢占后重新排队的报警。测试通过传入时间模拟调度，无需启动 Nav2。
+
+```bash
+colcon build --packages-select patrol_manager --symlink-install \
+  --cmake-args -DBUILD_TESTING=ON
+colcon test --packages-select patrol_manager --event-handlers console_direct+
+colcon test-result --verbose
+```
+
+**实测结果（2026-11-14，Ubuntu 终端记录）：** 构建成功；`mission_core` 通过，耗时 0.03 秒。
+
+```text
+PASS: 60 mission invariants
+100% tests passed, 0 tests failed out of 1
+Summary: 1 test, 0 errors, 0 failures, 0 skipped
+```
+
+这里是 1 个测试程序内的 60 次检查，不是 60 个独立测试；本次验证业务层规则，ROS2 服务调用留到任务 7。构建时有同名 underlay 包覆盖警告，本次仍构建成功。
+
+### 任务 7：接入自定义撤销服务
+
+**总体关系：** 任务 1～2 修改主管理节点的接警逻辑，任务 3～5 编写旁路状态观察节点；任务 6 实现撤销规则，任务 7 接入 ROS2 服务。最终调用链：终端请求 → `mission_node.cpp` 服务回调（任务 7）→ `mission.hpp` 的 `cancel_pending()`（任务 6）→ 返回结果。当前测试直接调用业务函数。
