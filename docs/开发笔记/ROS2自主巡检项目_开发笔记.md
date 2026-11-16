@@ -192,7 +192,7 @@ response:
 std_srvs.srv.Trigger_Response(success=True, message='Status received reset.')
 ```
 
-### 任务 6：业务层实现撤销
+## 任务 6：业务层实现撤销
 
 **输入：** 要撤销的排队报警 ID。
 
@@ -219,6 +219,225 @@ Summary: 1 test, 0 errors, 0 failures, 0 skipped
 
 这里是 1 个测试程序内的 60 次检查，不是 60 个独立测试；本次验证业务层规则，ROS2 服务调用留到任务 7。构建时有同名 underlay 包覆盖警告，本次仍构建成功。
 
-### 任务 7：接入自定义撤销服务
+## 任务 7：接入自定义撤销服务
 
-**总体关系：** 任务 1～2 修改主管理节点的接警逻辑，任务 3～5 编写旁路状态观察节点；任务 6 实现撤销规则，任务 7 接入 ROS2 服务。最终调用链：终端请求 → `mission_node.cpp` 服务回调（任务 7）→ `mission.hpp` 的 `cancel_pending()`（任务 6）→ 返回结果。当前测试直接调用业务函数。
+**总体关系：** 任务 1～2 修改主管理节点的接警逻辑，任务 3～5 编写旁路状态观察节点；任务 6 实现撤销规则，任务 7 接入 ROS2 服务。最终调用链：终端请求 → `mission_node.cpp` 服务回调（任务 7）→ `mission.hpp` 的 `cancel_pending()`（任务 6）→ 返回结果。
+因此本次的功能是：让外部终端通过一个ROS2服务，请求任务管理器撤销某个排队报警，并获得操作结果。
+
+**输入：** 对 `/patrol/cancel_pending` 的自定义服务请求，携带待撤销报警的 `id`。
+
+**处理：** 在接口包定义并注册 `CancelPending.srv`（请求 `string id`，响应 `bool success`、`string message`）；在 [mission_node.cpp](D:/4work/3project/ROS2_patrol_robot/src/patrol_manager/src/mission_node.cpp) 创建服务，回调调用任务 6 的 `cancel_pending()`，队列删除和记录仍由业务层负责。
+
+**输出：** 排队报警撤销成功时返回 `success: true`，发布对应的 `pending_cancelled` 记录；ID 不在等待队列中时返回 `false`，活动任务保持原样。
+
+**怎么验证成功：** 终端 B 持续执行 `ros2 topic echo /patrol/records`，其他操作在同一操作终端执行，保留 `run_id`。
+
+### 1. 检查接口、构建并运行核心测试
+
+```text
+# /src/patorl_interfaces/srv/CancelPending.srv 指定了内容，CMakLists中写明了srv/CancelPending.srv
+donk@ubuntu:~/ROS2_patrol_robot$ ros2 interface show patrol_interfaces/srv/CancelPending
+string id
+---
+bool success
+string message
+
+# colcon编译patrol_manager，这里也启动BUILD_TESTING
+donk@ubuntu:~/ROS2_patrol_robot$ colcon build --packages-up-to patrol_manager --symlink-install --cmake-args -DBUILD_TESTING=ON
+Summary: 2 packages finished [29.3s]
+
+donk@ubuntu:~/ROS2_patrol_robot$ source install/setup.bash
+
+# 运行patrol_manager包中的测试，并把执行输出直接显示在终端
+donk@ubuntu:~/ROS2_patrol_robot$ colcon test --packages-select patrol_manager --event-handlers console_direct+
+1: Test command: /home/donk/ROS2_patrol_robot/build/patrol_manager/test_mission
+1: Test timeout computed to be: 1500
+1: PASS: 60 mission invariants
+1/1 Test #1: mission_core .....................   Passed    0.00 sec
+100% tests passed, 0 tests failed out of 1
+Total Test time (real) =   0.01 sec
+Finished <<< patrol_manager [0.09s]
+Summary: 1 package finished [0.35s]
+
+
+donk@ubuntu:~/ROS2_patrol_robot$ colcon test-result --verbose
+Summary: 1 test, 0 errors, 0 failures, 0 skipped
+```
+
+结果：接口字段正确，两个包构建成功；有 underlay 覆盖警告。`mission_core` 通过，60 次检查属于 1 个测试程序。
+
+### 2. 暂停系统，提交 A、B、C
+
+```bash
+# 在 missino_node.cpp 中创建的/patrol/cancel_pending服务名称，接口类型 patrol_interfaces::srv::CancelPending
+donk@ubuntu:~/ROS2_patrol_robot$ ros2 service type /patrol/cancel_pending
+patrol_interfaces/srv/CancelPending
+
+# 暂停系统
+donk@ubuntu:~/ROS2_patrol_robot$ ros2 service call patrol/set_paused std_srvs/srv/SetBool '{data: true}'
+waiting for service to become available...
+requester: making request: std_srvs.srv.SetBool_Request(data=True)
+
+response:
+std_srvs.srv.SetBool_Response(success=True, message='Pause updated; status confirms navigation cancellation.')
+
+
+donk@ubuntu:~/ROS2_patrol_robot$ run_id="cancel-$(date +%s)"
+donk@ubuntu:~/ROS2_patrol_robot$ for suffix in A B C; do
+  ros2 topic pub --once /patrol/incidents patrol_interfaces/msg/Incident \
+  "{id: ${run_id}-${suffix}, priority: 50, target: {header: {frame_id: map}, pose: {position: {x: 1.0, y: 1.0}, orientation: {w: 1.0}}}, ttl_sec: 600.0, handling_sec: 30.0}"
+done
+publisher: beginning loop
+publishing #1: patrol_interfaces.msg.Incident(id='cancel-1794709846-A', priority=50, target=geometry_msgs.msg.PoseStamped(header=std_msgs.msg.Header(stamp=builtin_interfaces.msg.Time(sec=0, nanosec=0), frame_id='map'), pose=geometry_msgs.msg.Pose(position=geometry_msgs.msg.Point(x=1.0, y=1.0, z=0.0), orientation=geometry_msgs.msg.Quaternion(x=0.0, y=0.0, z=0.0, w=1.0))), ttl_sec=600.0, handling_sec=30.0, description='')
+
+publisher: beginning loop
+publishing #1: patrol_interfaces.msg.Incident(id='cancel-1794709846-B', priority=50, target=geometry_msgs.msg.PoseStamped(header=std_msgs.msg.Header(stamp=builtin_interfaces.msg.Time(sec=0, nanosec=0), frame_id='map'), pose=geometry_msgs.msg.Pose(position=geometry_msgs.msg.Point(x=1.0, y=1.0, z=0.0), orientation=geometry_msgs.msg.Quaternion(x=0.0, y=0.0, z=0.0, w=1.0))), ttl_sec=600.0, handling_sec=30.0, description='')
+
+publisher: beginning loop
+publishing #1: patrol_interfaces.msg.Incident(id='cancel-1794709846-C', priority=50, target=geometry_msgs.msg.PoseStamped(header=std_msgs.msg.Header(stamp=builtin_interfaces.msg.Time(sec=0, nanosec=0), frame_id='map'), pose=geometry_msgs.msg.Pose(position=geometry_msgs.msg.Point(x=1.0, y=1.0, z=0.0), orientation=geometry_msgs.msg.Quaternion(x=0.0, y=0.0, z=0.0, w=1.0))), ttl_sec=600.0, handling_sec=30.0, description='')
+
+# 检查topic /patrol/status，这里发现队列长度为3，三条报警都已接收；系统暂停、无活动任务、队列长度为 3。
+donk@ubuntu:~/ROS2_patrol_robot$ ros2 topic echo /patrol/status --once
+stamp:
+  sec: 1794709881
+  nanosec: 811069872
+state: PAUSED
+active_id: ''
+active_priority: 0
+patrol_index: 3
+queue_size: 3
+patrol_completed: 3
+events_completed: 0
+tasks_failed: 0
+paused: true
+motion_permitted: false
+fault: ''
+---
+```
+
+同时，终端 B：
+
+```text
+---
+stamp:
+  sec: 1794709853
+  nanosec: 613983868
+monotonic_sec: 2666.631180237
+kind: accepted
+task_id: cancel-1794709846-A
+detail: ''
+value: 0.0
+---
+stamp:
+  sec: 1794709854
+  nanosec: 910854345
+monotonic_sec: 2667.92804672
+kind: accepted
+task_id: cancel-1794709846-B
+detail: ''
+value: 0.0
+---
+stamp:
+  sec: 1794709856
+  nanosec: 512220937
+monotonic_sec: 2669.529416622
+kind: accepted
+task_id: cancel-1794709846-C
+detail: ''
+value: 0.0
+---
+```
+
+### 3. 撤销排队中的 A B C
+
+操作终端：
+
+```text
+# --------------撤销 B--------------
+donk@ubuntu:~/ROS2_patrol_robot$ ros2 service call /patrol/cancel_pending patrol_interfaces/srv/CancelPending "{id: ${run_id}-B}"
+waiting for service to become available...
+requester: making request: patrol_interfaces.srv.CancelPending_Request(id='cancel-1794709846-B')
+
+response:
+patrol_interfaces.srv.CancelPending_Response(success=True, message='Pending incident cancelled.')
+
+# 队列长度只有2了，撤销成功队列中的B
+donk@ubuntu:~/ROS2_patrol_robot$ ros2 topic echo /patrol/status --once
+stamp:
+  sec: 1794709969
+  nanosec: 510505321
+state: PAUSED
+active_id: ''
+active_priority: 0
+patrol_index: 3
+queue_size: 2
+patrol_completed: 3
+events_completed: 0
+tasks_failed: 0
+paused: true
+motion_permitted: false
+fault: ''
+---
+
+# --------------撤销 A--------------
+donk@ubuntu:~/ROS2_patrol_robot$ ros2 service call /patrol/cancel_pending patrol_interfaces/srv/CancelPending "{id: ${run_id}-A}"
+waiting for service to become available...
+requester: making request: patrol_interfaces.srv.CancelPending_Request(id='cancel-1794713401-A')
+
+response:
+patrol_interfaces.srv.CancelPending_Response(success=True, message='Pending incident cancelled.')
+
+donk@ubuntu:~/ROS2_patrol_robot$ ros2 topic echo /patrol/status --once
+stamp:
+  sec: 1794713769
+  nanosec: 795119863
+state: PAUSED
+active_id: ''
+active_priority: 0
+patrol_index: 2
+queue_size: 1
+patrol_completed: 2
+events_completed: 0
+tasks_failed: 0
+paused: true
+motion_permitted: false
+fault: ''
+---
+
+# --------------撤销 C--------------
+donk@ubuntu:~/ROS2_patrol_robot$ ros2 service call /patrol/cancel_pending patrol_interfaces/srv/CancelPending "{id: ${run_id}-C}"
+waiting for service to become available...
+requester: making request: patrol_interfaces.srv.CancelPending_Request(id='cancel-1794713401-C')
+
+response:
+patrol_interfaces.srv.CancelPending_Response(success=True, message='Pending incident cancelled.')
+
+donk@ubuntu:~/ROS2_patrol_robot$ ros2 topic echo /patrol/status --once
+stamp:
+  sec: 1794713778
+  nanosec: 296158213
+state: PAUSED
+active_id: ''
+active_priority: 0
+patrol_index: 2
+queue_size: 0
+patrol_completed: 2
+events_completed: 0
+tasks_failed: 0
+paused: true
+motion_permitted: false
+fault: ''
+---
+```
+
+## 任务 8：为 Nav2 目标增加反馈观察
+
+**目标：****导航过程中，打印当前任务、此次导航的编号和剩余距离，并控制日志频率**
+
+**输入：** 
+
+**处理：** 
+
+**输出：** 
+
+**怎么验证成功：** 

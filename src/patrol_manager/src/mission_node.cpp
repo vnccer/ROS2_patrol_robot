@@ -177,6 +177,8 @@ private:
   std::ofstream log_;
   bool seen_odom_{false}, life_active_{false}, life_pending_{false};
   double last_odom_{0}, odom_timeout_{1}, life_poll_{0}, life_reply_{0};
+  // 保存“上次打印反馈的时间”
+  double last_feedback_log_{-1.0};
   int64_t life_request_id_{0};
   std::string frame_;
   bool healthy() const {return seen_odom_&&wall_now()-last_odom_<odom_timeout_;}
@@ -205,7 +207,6 @@ private:
     t.expires=m->ttl_sec; t.handling=m->handling_sec;
     mission_->submit(t,wall_now());
   }
-
   void publish_permit() {
     std_msgs::msg::Bool m; m.data=mission_->permit()&&healthy()&&nav_ready(); permit_->publish(m);
   }
@@ -220,6 +221,8 @@ private:
     goal.pose.pose.orientation.z=std::sin(e.task.pose.yaw/2);
     goal.pose.pose.orientation.w=std::cos(e.task.pose.yaw/2);
     const auto token=e.token;
+    const auto task_id = e.task.id;
+    last_feedback_log_ = -1.0;
     auto options=rclcpp_action::Client<Nav>::SendGoalOptions();
     options.goal_response_callback=[this,token](Handle::SharedPtr h){
       if(token!=mission_->token) return;
@@ -230,6 +233,21 @@ private:
     options.result_callback=[this,token](const Handle::WrappedResult &r){
       if(token!=mission_->token) return;
       handle_.reset(); mission_->result(token,r.code==rclcpp_action::ResultCode::SUCCEEDED,wall_now());
+    };
+    options.feedback_callback=[this,token,task_id](Handle::SharedPtr,std::shared_ptr<const Nav::Feedback> feedback){
+      // 只观察当前仍在执行、且没有进入取消流程的导航
+      if(token!=mission_->token || !mission_->flying || mission_->cancelling || !mission_->active){return;}
+      // 同一次导航，两条反馈日志至少间隔1s
+      const double t = wall_now();
+      if(last_feedback_log_>=0.0 && t-last_feedback_log_<1.0){return;}
+      last_feedback_log_ = t;
+      RCLCPP_INFO(
+        get_logger(),
+        "feedback id=%s token=%llu remaining=%.2f m",
+        task_id.c_str(),
+        static_cast<unsigned long long>(token),
+        static_cast<double>(feedback->distance_remaining)
+      );
     };
     try {nav_->async_send_goal(goal,options);}
     catch(const std::exception &err) {
