@@ -9,10 +9,12 @@
 #include <sstream>
 #include <unistd.h>
 #include "patrol_manager/mission.hpp"
+#include "patrol_manager/feedback_path.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "nav2_msgs/action/navigate_to_pose.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include "nav_msgs/msg/path.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_srvs/srv/set_bool.hpp"
 #include "std_srvs/srv/trigger.hpp"
@@ -102,6 +104,18 @@ public:
           last_odom_=wall_now(); seen_odom_=true;
         }
       });
+    // /plan 是规划器发布的全局路径；只用于进度显示。
+    global_plan_=create_subscription<nav_msgs::msg::Path>("plan",rclcpp::QoS(1),
+      [this](nav_msgs::msg::Path::ConstSharedPtr m){
+        if(!mission_->flying || mission_->cancelling || !mission_->active) return;
+        std::vector<patrol::FeedbackPoint> points; points.reserve(m->poses.size());
+        for(const auto &pose:m->poses) {
+          if(!pose.header.frame_id.empty() && pose.header.frame_id!=m->header.frame_id) return;
+          points.push_back({pose.pose.position.x,pose.pose.position.y});
+        }
+        feedback_path_.update(mission_->token,rclcpp::Time(m->header.stamp).nanoseconds(),
+                              m->header.frame_id,std::move(points));
+      });
     incidents_=create_subscription<patrol_interfaces::msg::Incident>("patrol/incidents",50,
       [this](patrol_interfaces::msg::Incident::ConstSharedPtr m){
         on_incident(m);
@@ -167,6 +181,7 @@ private:
   rclcpp::Publisher<patrol_interfaces::msg::TaskRecord>::SharedPtr record_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr permit_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_;
+  rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr global_plan_;
   rclcpp::Subscription<patrol_interfaces::msg::Incident>::SharedPtr incidents_;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr pause_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr estop_,recover_,shutdown_;
@@ -179,6 +194,8 @@ private:
   double last_odom_{0}, odom_timeout_{1}, life_poll_{0}, life_reply_{0};
   // 保存“上次打印反馈的时间”
   double last_feedback_log_{-1.0};
+  patrol::FeedbackPath feedback_path_;
+  bool feedback_waiting_logged_{false};
   int64_t life_request_id_{0};
   std::string frame_;
   bool healthy() const {return seen_odom_&&wall_now()-last_odom_<odom_timeout_;}
@@ -223,6 +240,9 @@ private:
     const auto token=e.token;
     const auto task_id = e.task.id;
     last_feedback_log_ = -1.0;
+    feedback_waiting_logged_ = false;
+    feedback_path_.reset(token,rclcpp::Time(goal.pose.header.stamp).nanoseconds(),
+                         frame_,{e.task.pose.x,e.task.pose.y});
     auto options=rclcpp_action::Client<Nav>::SendGoalOptions();
     options.goal_response_callback=[this,token](Handle::SharedPtr h){
       if(token!=mission_->token) return;
@@ -241,14 +261,26 @@ private:
       const double interval = mission_->active->event ? 1.0 : 5.0;
       const double t = wall_now();
       if(last_feedback_log_>=0.0 && t-last_feedback_log_<interval){return;}
+      // Nav2 首帧的 distance_remaining 可能仍由上一条路径计算。
+      // 改用本次派发后生成、且终点匹配的 /plan 与当前反馈位置估算路径剩余长度。
+      const auto &pose=feedback->current_pose;
+      const auto remaining=feedback_path_.remaining(
+        token,rclcpp::Time(pose.header.stamp).nanoseconds(),pose.header.frame_id,
+        {pose.pose.position.x,pose.pose.position.y});
+      if(!remaining) {
+        if(!feedback_waiting_logged_) {
+          RCLCPP_INFO(get_logger(),"feedback id=%s token=%llu remaining=WAITING_FOR_CURRENT_PLAN",
+                      task_id.c_str(),static_cast<unsigned long long>(token));
+          feedback_waiting_logged_=true;
+        }
+        return; // 等待不会占用数字反馈的限频窗口，新数据到达后立即输出。
+      }
       last_feedback_log_ = t;
-      RCLCPP_INFO(
-        get_logger(),
-        "feedback id=%s token=%llu remaining=%.2f m",
-        task_id.c_str(),
-        static_cast<unsigned long long>(token),
-        static_cast<double>(feedback->distance_remaining)
-      );
+      RCLCPP_INFO(get_logger(),"feedback id=%s token=%llu remaining=%.2f m source=current_plan",
+                  task_id.c_str(),static_cast<unsigned long long>(token),*remaining);
+      RCLCPP_DEBUG(get_logger(),"feedback_raw id=%s token=%llu nav_remaining=%.2f m",
+                   task_id.c_str(),static_cast<unsigned long long>(token),
+                   static_cast<double>(feedback->distance_remaining));
     };
     try {nav_->async_send_goal(goal,options);}
     catch(const std::exception &err) {

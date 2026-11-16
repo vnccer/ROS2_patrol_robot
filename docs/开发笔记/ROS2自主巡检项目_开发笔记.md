@@ -9,12 +9,45 @@ cd ~/ROS2_patrol_robot
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 
-# 刚刚clone项目时，先完整编译一遍
+# 修改源码后执行
+colcon xxx
+source install/setup.bash
+```
+
+colcon使用：
+```bash
+colcon build [选择哪些包] --symlink-install [额外构建设置]
+
+# 第一次编译整个项目（刚刚clone项目时）
 colcon build --symlink-install
 
-# 修改源码后执行
+# 依赖的构建结果已经可用，只编当前包
 colcon build --packages-select patrol_manager --symlink-install
-source install/setup.bash
+
+# 依赖也要一起构建或更新
+colcon build --packages-up-to patrol_manger --symlink-install
+
+# 同时修改了任务代码和启动配置
+colcon build --packages-up-to patrol_manger patrol_bringup --sumlink-install
+```
+
+- `--packages-select`：只选择你写出的包。
+- `--packages-up-to`：选择你写出的包，以及它们依赖的包
+
+额外设置：
+
+```
+# 把测试程序编译出来
+--cmake-args -DBUILD_TESTING=ON
+
+# 方便 GDB 下断点、查看变量
+--cmake-args -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Debug
+
+# 真正运行你写的检查
+colcon test --packages-select patrol_manager
+
+# 汇总已有结果，不会再测试一遍
+colcon test-result --verbose
 ```
 
 ## 任务 1：报警接收计数
@@ -621,7 +654,7 @@ ros2 topic pub --once /patrol/incidents patrol_interfaces/msg/Incident "{id: ${r
 - 限频：按同一 ID/token 分组，相邻反馈日志间隔约 1.000～1.051 秒，符合清理前每秒最多输出一次的设置。
 - 记录边界：暂停恢复和抢占恢复后的低优先级报警尚未附上最终到达、完成输出；未专门注入迟到反馈验证过滤分支，不把片段外结果写成已完成。
 
-反馈距离在新导航开始时出现上升，不据此判定任务身份混乱。Nav2 按当前路径计算剩余距离，路径更新时数值可能增大；具体每次跳变的原因尚未单独核实。[Nav2 Humble 实现](https://github.com/ros-navigation/navigation2/blob/humble/nav2_bt_navigator/src/navigators/navigate_to_pose.cpp)
+反馈日志的任务 ID/token 切换正确，但这不足以证明首帧距离有效。后续观察到多个新目标首帧重复上一段末尾的 0.几米；新目标初始化与新路径生成之间可能仍读到缓存路径，因此原始首帧距离不能直接用作当前目标的有效估计。[Nav2 Humble 实现](https://github.com/ros-navigation/navigation2/blob/humble/nav2_bt_navigator/src/navigators/navigate_to_pose.cpp)
 
 ### 日志清理后的查看方式
 
@@ -641,3 +674,28 @@ bash scripts/run.sh rviz:=false
 # 需要诊断时，先退出旧系统，再用此命令重启
 bash scripts/run.sh rviz:=false nav_log_level:=warn mission_log_level:=debug
 ```
+
+### 首帧距离修复（代码已修改，待 Ubuntu 复测）
+
+- 不采用“跳过第一帧”或固定延时。新增全局路径订阅；每次派发、暂停恢复重派、抢占重派都清空距离缓存。
+- 路径必须在本次派发之后生成，坐标系匹配，终点距离当前目标不超过 0.5 m（与当前 Navfn 规划终点容差对应）；乱序和旧路径不替换已接受路径。
+- 使用这条路径与 Action 反馈中的当前位置，计算到路径投影点的连接距离及后续路径长度。位置时间戳必须不早于该路径生成时间。
+- 尚未拿到当前路径或对应位置时，只输出一次 `remaining=WAITING_FOR_CURRENT_PLAN`；有效数字首次出现不必等待巡逻的 5 秒限频周期。
+- 数字日志标注 `source=current_plan`，属于本节点基于当前规划的路径距离估计；原始 Nav2 数值仅在 DEBUG 的 `feedback_raw ... nav_remaining=...` 中保留。`/plan` 没有 Action UUID，当前项目用时间、坐标系和终点关联目标。
+- 到达、完成、取消及任务调度继续使用原有 Action 结果；显示的距离不参与这些决策。原始实验输出保留，以上修复尚不能记录为 Ubuntu 实测通过。
+- 本地 C++ 回归：新增路径距离测试 41 次检查通过，原有任务核心 60 次检查通过；这不是 Ubuntu/Nav2 的集成实测结果。
+
+```bash
+# 同步新头文件、测试、CMake 和节点源码后，在 Ubuntu 执行
+cd ~/ROS2_patrol_robot
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+colcon build --packages-select patrol_manager --symlink-install \
+  --cmake-args -DBUILD_TESTING=ON
+source install/setup.bash
+colcon test --packages-select patrol_manager --event-handlers console_direct+
+colcon test-result --verbose
+bash scripts/run.sh rviz:=false
+```
+
+复测相隔较远的巡逻点，确认先等待或直接输出合理的新路径距离；暂停恢复和抢占后应使用新 token 重新等待新路径。等待状态只报告一次，不应把旧数值反复打印成新任务的剩余距离。

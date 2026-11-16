@@ -35,7 +35,8 @@ def build(test=True):
         temporary.mkdir(parents=True,exist_ok=True)
         env['TMP'] = env['TEMP'] = str(temporary)
     base = cc+['-std=c++17','-Wall','-Wextra','-Wpedantic','-I'+str(ROOT/'src/patrol_manager/include')]
-    for source,name in [('tools/core_bridge.cpp','core_bridge'),('src/patrol_manager/test/test_mission.cpp','test_mission')]:
+    for source,name in [('tools/core_bridge.cpp','core_bridge'),('src/patrol_manager/test/test_mission.cpp','test_mission'),
+                        ('src/patrol_manager/test/test_feedback_path.cpp','test_feedback_path')]:
         result = subprocess.run(base+[str(ROOT/source),'-o',str(output/(name+suffix))],
                                 env=env,capture_output=True,text=True,encoding='utf-8',errors='replace')
         (output/(name+'_build.log')).write_text(result.stdout+result.stderr,encoding='utf-8')
@@ -43,7 +44,8 @@ def build(test=True):
             print((result.stdout+result.stderr)[-6000:],file=__import__('sys').stderr)
             result.check_returncode()
     if test:
-        subprocess.run([str(output/('test_mission'+suffix))],check=True)
+        for name in ('test_mission','test_feedback_path'):
+            subprocess.run([str(output/(name+suffix))],check=True)
     return output/('core_bridge'+suffix)
 
 if __name__=='__main__':

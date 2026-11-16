@@ -97,6 +97,8 @@ bash scripts/run.sh rviz:=false
 
 终端默认保留巡逻派发、报警过程、暂停/抢占和网页地址；报警距离反馈每秒一次，普通巡逻每五秒一次。重复接收计数及普通巡逻的到达/完成日志放在 DEBUG，完整任务事件仍发布到 `/patrol/records` 并写入 CSV。Nav2 默认只显示 ERROR 及以上日志，速度门禁等其他基础节点保留 WARN。
 
+导航距离使用本次目标派发后生成、坐标系及终点匹配的 `/plan`，结合反馈中的当前位置估算；日志标注 `source=current_plan`。新路径或相应位置尚未就绪时显示 `remaining=WAITING_FOR_CURRENT_PLAN`，不显示上一条路径的残留数值。原始 Nav2 `distance_remaining` 保留在 DEBUG 的 `feedback_raw ... nav_remaining=...` 中。
+
 需要查看 Nav2 警告和完整任务日志时：
 
 ```bash
