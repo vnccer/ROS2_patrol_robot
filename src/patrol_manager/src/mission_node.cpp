@@ -189,7 +189,7 @@ private:
   // 报警处理提取成成员函数
   void on_incident(patrol_interfaces::msg::Incident::ConstSharedPtr m) {
     ++incident_received_count_;
-    RCLCPP_INFO(
+    RCLCPP_DEBUG(
       get_logger(),
       "received=%u id=%s priority=%d",
       incident_received_count_,
@@ -235,12 +235,12 @@ private:
       handle_.reset(); mission_->result(token,r.code==rclcpp_action::ResultCode::SUCCEEDED,wall_now());
     };
     options.feedback_callback=[this,token,task_id](Handle::SharedPtr,std::shared_ptr<const Nav::Feedback> feedback){
-      RCLCPP_INFO_ONCE(get_logger(), "TASK8_FEEDBACK_RECEIVED");
       // 只观察当前仍在执行、且没有进入取消流程的导航
       if(token!=mission_->token || !mission_->flying || mission_->cancelling || !mission_->active){return;}
-      // 同一次导航，两条反馈日志至少间隔1s
+      // 报警每秒反馈一次，普通巡逻每五秒反馈一次。
+      const double interval = mission_->active->event ? 1.0 : 5.0;
       const double t = wall_now();
-      if(last_feedback_log_>=0.0 && t-last_feedback_log_<1.0){return;}
+      if(last_feedback_log_>=0.0 && t-last_feedback_log_<interval){return;}
       last_feedback_log_ = t;
       RCLCPP_INFO(
         get_logger(),
@@ -250,7 +250,6 @@ private:
         static_cast<double>(feedback->distance_remaining)
       );
     };
-    RCLCPP_INFO(get_logger(), "TASK8_READY id=%s", task_id.c_str());
     try {nav_->async_send_goal(goal,options);}
     catch(const std::exception &err) {
       mission_->result(token,false,wall_now()); mission_->trip(err.what(),wall_now());
@@ -280,7 +279,13 @@ private:
         m.stamp=now(); m.monotonic_sec=t; m.kind=e.name; m.task_id=e.task.id; m.detail=e.detail; m.value=e.value;
         record_->publish(m);
         log_<<std::setprecision(15)<<now().seconds()<<','<<t<<','<<csv(e.name)<<','<<csv(e.task.id)<<','<<csv(e.detail)<<','<<e.value<<'\n';
-        log_.flush(); RCLCPP_INFO(get_logger(),"%s %s %s",e.name.c_str(),e.task.id.c_str(),e.detail.c_str());
+        log_.flush();
+        // 巡逻派发保留在主终端，到达和完成的详细记录可通过 DEBUG、话题或 CSV 查看。
+        if(e.task.id.rfind("patrol/",0)==0 && (e.name=="arrived" || e.name=="completed")) {
+          RCLCPP_DEBUG(get_logger(),"%s %s %s",e.name.c_str(),e.task.id.c_str(),e.detail.c_str());
+        } else {
+          RCLCPP_INFO(get_logger(),"%s %s %s",e.name.c_str(),e.task.id.c_str(),e.detail.c_str());
+        }
       }
     }
     if(!log_) mission_->trip("audit log write failed",t);

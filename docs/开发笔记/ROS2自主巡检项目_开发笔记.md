@@ -432,88 +432,64 @@ fault: ''
 
 ## 任务 8：为 Nav2 目标增加反馈观察
 
-**目标：**导航过程中，打印当前任务、此次导航的编号和剩余距离，并控制日志频率**
+**目标：** 导航过程中，打印当前任务、此次导航的编号和剩余距离，并控制日志频率。
 
-**输入：** 
+**输入：** Nav2 返回的导航反馈，以及本次派发时保存的任务 ID 和 token。
 
-**处理：** 
+**处理：** 在 `start()` 注册反馈回调，检查 token、导航和取消状态，读取 `distance_remaining` 并限频打印。
 
-**输出：** 
+**输出：** 主系统终端显示 `feedback id=... token=... remaining=... m`。
 
-**怎么验证成功：** 
+**怎么验证成功：** 以下为本次实测原始记录；记录产生于日志清理前，保留当时的临时标记和警告。
 
-```
-#终端C
-donk@ubuntu:~/ROS2_patrol_robot$ run_id="feedback-$(date +%s)"
-donk@ubuntu:~/ROS2_patrol_robot$ ros2 topic pub --once /patrol/incidents patrol_interfaces/msg/Incident \
-> "{id: ${run_id}-low, priority: 20, target: {header: {frame_id: map}, pose: {position: {x: 7.0, y: 7.0}, orientation: {w: 1.0}}}, ttl_sec: 600.0, handling_sec: 3.0}"
-Waiting for at least 1 matching subscription(s)...
-publisher: beginning loop
-publishing #1: patrol_interfaces.msg.Incident(id='feedback-1794807277-low', priority=20, target=geometry_msgs.msg.PoseStamped(header=std_msgs.msg.Header(stamp=builtin_interfaces.msg.Time(sec=0, nanosec=0), frame_id='map'), pose=geometry_msgs.msg.Pose(position=geometry_msgs.msg.Point(x=7.0, y=7.0, z=0.0), orientation=geometry_msgs.msg.Quaternion(x=0.0, y=0.0, z=0.0, w=1.0))), ttl_sec=600.0, handling_sec=3.0, description='')
+输入一次low级别的报警事件，看终端是否显示
 
+```BASH
 #终端B
----
-stamp:
-  sec: 1794807311
-  nanosec: 250859036
-monotonic_sec: 4233.852046921
-kind: dispatched
-task_id: feedback-1794807277-low
-detail: ''
-value: 0.13640745900011098
----
-stamp:
-  sec: 1794807338
-  nanosec: 196814140
-monotonic_sec: 4260.798235827
-kind: arrived
-task_id: feedback-1794807277-low
-detail: ''
-value: 27.042978071000107
----
-stamp:
-  sec: 1794807341
-  nanosec: 196935061
-monotonic_sec: 4263.798367759
-kind: completed
-task_id: feedback-1794807277-low
-detail: ''
-value: 0.0
----
+run_id="feedback-$(date +%s)"
+ros2 topic pub --once /patrol/incidents patrol_interfaces/msg/Incident "{id: ${run_id}-low, priority: 20, target: {header: {frame_id: map}, pose: {position: {x: 7.0, y: 7.0}, orientation: {w: 1.0}}}, ttl_sec: 600.0, handling_sec: 3.0}"
 
 #终端A
-[mission_manager-12] [INFO] [1794807311.114033024] [mission_manager]: received=1 id=feedback-1794807277-low priority=20
-[mission_manager-12] [INFO] [1794807311.147661058] [mission_manager]: accepted feedback-1794807277-low 
-[mission_manager-12] [INFO] [1794807311.147759084] [mission_manager]: cancel_requested patrol/1 preempt
-[mission_manager-12] [INFO] [1794807311.250793745] [mission_manager]: cancelled patrol/1 preempt
-[mission_manager-12] [INFO] [1794807311.259286228] [mission_manager]: dispatched feedback-1794807277-low 
-[mission_manager-12] [INFO] [1794807338.198329852] [mission_manager]: arrived feedback-1794807277-low 
-[mission_manager-12] [INFO] [1794807341.198285307] [mission_manager]: completed feedback-1794807277-low 
-
+[bt_navigator-9] [WARN] [1794809128.125415523] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
+[controller_server-5] [WARN] [1794809128.188720248] [controller_server]: Control loop missed its desired rate of 10.0000Hz
+[mission_manager-12] [INFO] [1794809128.595724769] [mission_manager]: received=2 id=feedback-1794808893-low priority=20
+[mission_manager-12] [INFO] [1794809128.607637434] [mission_manager]: accepted feedback-1794808893-low 
+[mission_manager-12] [INFO] [1794809128.607824694] [mission_manager]: cancel_requested patrol/3 preempt
+[mission_manager-12] [INFO] [1794809128.707701904] [mission_manager]: cancelled patrol/3 preempt
+[mission_manager-12] [INFO] [1794809128.707738613] [mission_manager]: TASK8_READY id=feedback-1794808893-low
+[mission_manager-12] [INFO] [1794809128.709850732] [mission_manager]: dispatched feedback-1794808893-low 
+[mission_manager-12] [INFO] [1794809128.736634128] [mission_manager]: feedback id=feedback-1794808893-low token=17 remaining=4.75 m
+[mission_manager-12] [INFO] [1794809129.762647491] [mission_manager]: feedback id=feedback-1794808893-low token=17 remaining=1.30 m
+[mission_manager-12] [INFO] [1794809130.763810454] [mission_manager]: feedback id=feedback-1794808893-low token=17 remaining=1.33 m
+[mission_manager-12] [INFO] [1794809131.812574729] [mission_manager]: feedback id=feedback-1794808893-low token=17 remaining=1.15 m
+[mission_manager-12] [INFO] [1794809132.812635214] [mission_manager]: feedback id=feedback-1794808893-low token=17 remaining=0.90 m
+[mission_manager-12] [INFO] [1794809133.862511173] [mission_manager]: feedback id=feedback-1794808893-low token=17 remaining=0.64 m
+[mission_manager-12] [INFO] [1794809134.912633429] [mission_manager]: feedback id=feedback-1794808893-low token=17 remaining=0.37 m
+[mission_manager-12] [INFO] [1794809135.902798145] [mission_manager]: arrived feedback-1794808893-low 
+[mission_manager-12] [INFO] [1794809138.902869076] [mission_manager]: completed feedback-1794808893-low 
+[mission_manager-12] [INFO] [1794809138.952110072] [mission_manager]: TASK8_READY id=patrol/3
 ```
 
-这次暂停在主系统出现报警、机器人仍在导航时
+主系统出现报警、机器人仍在导航时暂停
 
-```
-#终端C
-donk@ubuntu:~/ROS2_patrol_robot$ ros2 service call /patrol/set_paused \
-  std_srvs/srv/SetBool '{data: true}'
-waiting for service to become available...
-requester: making request: std_srvs.srv.SetBool_Request(data=True)
+```bash
+#终端B
+run_id="feedback-$(date +%s)"
+ros2 topic pub --once /patrol/incidents patrol_interfaces/msg/Incident "{id: ${run_id}-low, priority: 20, target: {header: {frame_id: map}, pose: {position: {x: 7.0, y: 7.0}, orientation: {w: 1.0}}}, ttl_sec: 600.0, handling_sec: 3.0}"
 
-response:
-std_srvs.srv.SetBool_Response(success=True, message='Pause updated; status confirms navigation cancellation.')
+ros2 service call /patrol/set_paused std_srvs/srv/SetBool '{data: true}'
 
-donk@ubuntu:~/ROS2_patrol_robot$ ros2 topic echo /patrol/status --once
+ros2 topic echo /patrol/status --once
+---
 stamp:
-  sec: 1794807448
-  nanosec: 804466918
+  sec: 1794809372
+  nanosec: 960383743
 state: PAUSED
 active_id: ''
 active_priority: 0
 patrol_index: 0
-queue_size: 0
-patrol_completed: 8
+queue_size: 1
+patrol_completed: 20
 events_completed: 1
 tasks_failed: 0
 paused: true
@@ -521,178 +497,147 @@ motion_permitted: false
 fault: ''
 ---
 
-#终端B
----
-stamp:
-  sec: 1794807425
-  nanosec: 552702089
-monotonic_sec: 4348.15391001
-kind: dispatched
-task_id: patrol/0
-detail: ''
-value: 0.0
----
-stamp:
-  sec: 1794807428
-  nanosec: 202735001
-monotonic_sec: 4350.804155343
-kind: duplicate
-task_id: feedback-1794807277-low
-detail: ignored
-value: 0.0
----
-stamp:
-  sec: 1794807438
-  nanosec: 560223167
-monotonic_sec: 4361.161646556
-kind: paused
-task_id: patrol/0
-detail: ''
-value: 0.0
----
-stamp:
-  sec: 1794807438
-  nanosec: 605653725
-monotonic_sec: 4361.161646556
-kind: cancel_requested
-task_id: patrol/0
-detail: pause
-value: 0.0
----
-stamp:
-  sec: 1794807438
-  nanosec: 802465228
-monotonic_sec: 4361.403895019
-kind: cancelled
-task_id: patrol/0
-detail: pause
-value: 0.0
----
-
 #终端A
-[bt_navigator-9] [WARN] [1794807427.509651907] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
-[bt_navigator-9] [WARN] [1794807427.604996714] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
-[controller_server-5] [WARN] [1794807427.664340199] [controller_server]: Control loop missed its desired rate of 10.0000Hz
-[mission_manager-12] [INFO] [1794807428.182075287] [mission_manager]: received=2 id=feedback-1794807277-low priority=20
-[mission_manager-12] [INFO] [1794807428.205539281] [mission_manager]: duplicate feedback-1794807277-low ignored
-[bt_navigator-9] [WARN] [1794807438.157841142] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
-[bt_navigator-9] [WARN] [1794807438.279467815] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
-[bt_navigator-9] [WARN] [1794807438.279844548] [bt_navigator_navigate_to_pose_rclcpp_node]: Timed out while waiting for action server to acknowledge goal request for compute_path_to_pose
-[controller_server-5] [WARN] [1794807438.285246209] [controller_server]: Control loop missed its desired rate of 10.0000Hz
-[bt_navigator-9] [WARN] [1794807438.392272406] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
-[bt_navigator-9] [WARN] [1794807438.392308214] [bt_navigator_navigate_to_pose_rclcpp_node]: Node timed out while executing service call to global_costmap/clear_entirely_global_costmap.
-[controller_server-5] [WARN] [1794807438.395160874] [controller_server]: Control loop missed its desired rate of 10.0000Hz
-[mission_manager-12] [INFO] [1794807438.562630830] [mission_manager]: paused patrol/0 
-[mission_manager-12] [INFO] [1794807438.605724815] [mission_manager]: cancel_requested patrol/0 pause
-[bt_navigator-9] [WARN] [1794807438.645807840] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
-[bt_navigator-9] [ERROR] [1794807438.756476561] [bt_navigator_navigate_to_pose_rclcpp_node]: Failed to get result for compute_path_to_pose in node halt!
-[mission_manager-12] [INFO] [1794807438.803799003] [mission_manager]: cancelled patrol/0 pause
-[planner_server-7] [WARN] [1794807438.903474589] [planner_server]: Planner loop missed its desired rate of 20.0000 Hz. Current loop rate is 3.7986 Hz
+[controller_server-5] [WARN] [1794809340.515769951] [controller_server]: Control loop missed its desired rate of 10.0000Hz
+[bt_navigator-9] [WARN] [1794809340.568559265] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
+[mission_manager-12] [INFO] [1794809340.901318252] [mission_manager]: arrived patrol/0 
+[mission_manager-12] [INFO] [1794809341.102783333] [mission_manager]: received=5 id=feedback-1794809315-low priority=20
+[mission_manager-12] [INFO] [1794809341.158525083] [mission_manager]: accepted feedback-1794809315-low 
+[mission_manager-12] [INFO] [1794809341.202894199] [mission_manager]: TASK8_READY id=feedback-1794809315-low
+[mission_manager-12] [INFO] [1794809341.211661422] [mission_manager]: dispatched feedback-1794809315-low 
+[mission_manager-12] [INFO] [1794809341.242539051] [mission_manager]: feedback id=feedback-1794809315-low token=25 remaining=0.22 m
+[mission_manager-12] [INFO] [1794809342.265494267] [mission_manager]: feedback id=feedback-1794809315-low token=25 remaining=8.15 m
+[mission_manager-12] [INFO] [1794809343.315655765] [mission_manager]: feedback id=feedback-1794809315-low token=25 remaining=7.87 m
+[mission_manager-12] [INFO] [1794809344.365559792] [mission_manager]: feedback id=feedback-1794809315-low token=25 remaining=7.60 m
+[mission_manager-12] [INFO] [1794809345.415531659] [mission_manager]: feedback id=feedback-1794809315-low token=25 remaining=7.32 m
+[mission_manager-12] [INFO] [1794809346.415631758] [mission_manager]: feedback id=feedback-1794809315-low token=25 remaining=7.07 m
+[mission_manager-12] [INFO] [1794809347.415637218] [mission_manager]: feedback id=feedback-1794809315-low token=25 remaining=6.80 m
+[bt_navigator-9] [WARN] [1794809348.278439555] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
+[bt_navigator-9] [WARN] [1794809348.278490746] [bt_navigator_navigate_to_pose_rclcpp_node]: Timed out while waiting for action server to acknowledge goal request for follow_path
+[controller_server-5] [WARN] [1794809348.299220608] [controller_server]: Control loop missed its desired rate of 10.0000Hz
+[controller_server-5] [WARN] [1794809348.364248643] [controller_server]: [follow_path] [ActionServer] Aborting handle.
+[bt_navigator-9] [WARN] [1794809348.430737065] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
+[mission_manager-12] [INFO] [1794809348.449043339] [mission_manager]: paused feedback-1794809315-low 
+[mission_manager-12] [INFO] [1794809348.449110366] [mission_manager]: cancel_requested feedback-1794809315-low pause
+[bt_navigator-9] [ERROR] [1794809348.586588147] [bt_navigator_navigate_to_pose_rclcpp_node]: Failed to get result for follow_path in node halt!
+[mission_manager-12] [INFO] [1794809348.604333325] [mission_manager]: cancelled feedback-1794809315-low pause
+[controller_server-5] [WARN] [1794809348.619251957] [controller_server]: Control loop missed its desired rate of 10.0000Hz
 
 ```
 
 接着取消暂停
 
-```
-#终端C
-donk@ubuntu:~/ROS2_patrol_robot$ ros2 service call /patrol/set_paused \
-  std_srvs/srv/SetBool '{data: false}'
-waiting for service to become available...
-requester: making request: std_srvs.srv.SetBool_Request(data=False)
-
-response:
-std_srvs.srv.SetBool_Response(success=True, message='Pause updated; status confirms navigation cancellation.')
-
+```BASH
 #终端B
----
-stamp:
-  sec: 1794807657
-  nanosec: 67109875
-monotonic_sec: 4579.668546254
-kind: resumed
-task_id: ''
-detail: ''
-value: 0.0
----
-stamp:
-  sec: 1794807657
-  nanosec: 76739215
-monotonic_sec: 4579.668546254
-kind: dispatched
-task_id: patrol/0
-detail: ''
-value: 0.0
----
+ros2 service call /patrol/set_paused std_srvs/srv/SetBool '{data: false}'
 
 #终端A
-[mission_manager-12] [INFO] [1794807657.076626211] [mission_manager]: resumed  
-[mission_manager-12] [INFO] [1794807657.098800510] [mission_manager]: dispatched patrol/0 
-[mission_manager-12] [INFO] [1794807671.512669472] [mission_manager]: arrived patrol/0 
-[mission_manager-12] [INFO] [1794807672.512935568] [mission_manager]: completed patrol/0 
-[mission_manager-12] [INFO] [1794807672.562981115] [mission_manager]: dispatched patrol/1 
+[mission_manager-12] [INFO] [1794809398.353209892] [mission_manager]: resumed  
+[mission_manager-12] [INFO] [1794809398.353250821] [mission_manager]: TASK8_READY id=feedback-1794809315-low
+[mission_manager-12] [INFO] [1794809398.353310520] [mission_manager]: dispatched feedback-1794809315-low 
+[mission_manager-12] [INFO] [1794809398.415745035] [mission_manager]: feedback id=feedback-1794809315-low token=26 remaining=6.52 m
+
 ```
 
 验证高优先级抢占
 
-```
-#终端C
-ros2 topic pub --once /patrol/incidents patrol_interfaces/msg/Incident \
-"{id: ${run_id}-low, priority: 20, target: {header: {frame_id: map}, pose: {position: {x: 7.0, y: 7.0}, orientation: {w: 1.0}}}, ttl_sec: 600.0, handling_sec: 3.0}"
-#随后快速再输入
-ros2 topic pub --once /patrol/incidents patrol_interfaces/msg/Incident \
-"{id: ${run_id}-urgent, priority: 100, target: {header: {frame_id: map}, pose: {position: {x: 1.0, y: 7.0}, orientation: {w: 1.0}}}, ttl_sec: 600.0, handling_sec: 3.0}"
-
+```BASH
 #终端B
----
-stamp:
-  sec: 1794807757
-  nanosec: 265652513
-monotonic_sec: 4679.867027667
-kind: duplicate
-task_id: feedback-1794807277-low
-detail: ignored
-value: 0.0
----
-stamp:
-  sec: 1794807760
-  nanosec: 214669587
-monotonic_sec: 4682.8160825
-kind: accepted
-task_id: feedback-1794807277-urgent
-detail: ''
-value: 0.0
----
-stamp:
-  sec: 1794807760
-  nanosec: 215919207
-monotonic_sec: 4682.8160825
-kind: cancel_requested
-task_id: patrol/0
-detail: preempt
-value: 0.0
----
-
+run_id="feedback-$(date +%s)"
+ros2 topic pub --once /patrol/incidents patrol_interfaces/msg/Incident "{id: ${run_id}-low, priority: 20, target: {header: {frame_id: map}, pose: {position: {x: 7.0, y: 7.0}, orientation: {w: 1.0}}}, ttl_sec: 600.0, handling_sec: 3.0}"
+#随后快速再输入
+ros2 topic pub --once /patrol/incidents patrol_interfaces/msg/Incident "{id: ${run_id}-urgent, priority: 100, target: {header: {frame_id: map}, pose: {position: {x: 1.0, y: 7.0}, orientation: {w: 1.0}}}, ttl_sec: 600.0, handling_sec: 3.0}"
 
 #终端A
-[mission_manager-12] [INFO] [1794807757.227828934] [mission_manager]: received=3 id=feedback-1794807277-low priority=20
-[mission_manager-12] [INFO] [1794807757.301906731] [mission_manager]: duplicate feedback-1794807277-low ignored
-[bt_navigator-9] [WARN] [1794807757.358695415] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
-[controller_server-5] [WARN] [1794807757.456753435] [controller_server]: Control loop missed its desired rate of 10.0000Hz
-[bt_navigator-9] [WARN] [1794807757.466548006] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
-[controller_server-5] [WARN] [1794807757.478214065] [controller_server]: Control loop missed its desired rate of 10.0000Hz
-[controller_server-5] [WARN] [1794807759.706733037] [controller_server]: Control loop missed its desired rate of 10.0000Hz
-[controller_server-5] [WARN] [1794807759.787296230] [controller_server]: Control loop missed its desired rate of 10.0000Hz
-[mission_manager-12] [INFO] [1794807760.189091152] [mission_manager]: received=4 id=feedback-1794807277-urgent priority=100
-[mission_manager-12] [INFO] [1794807760.215740063] [mission_manager]: accepted feedback-1794807277-urgent 
-[mission_manager-12] [INFO] [1794807760.216024564] [mission_manager]: cancel_requested patrol/0 preempt
-[mission_manager-12] [INFO] [1794807760.318506193] [mission_manager]: cancelled patrol/0 preempt
-[mission_manager-12] [INFO] [1794807760.321651459] [mission_manager]: dispatched feedback-1794807277-urgent 
-[mission_manager-12] [INFO] [1794807769.064369688] [mission_manager]: arrived feedback-1794807277-urgent 
-[mission_manager-12] [INFO] [1794807772.063549856] [mission_manager]: completed feedback-1794807277-urgent 
-[mission_manager-12] [INFO] [1794807772.115139588] [mission_manager]: dispatched patrol/0
+[controller_server-5] [WARN] [1794809486.110027318] [controller_server]: Control loop missed its desired rate of 10.0000Hz
+[mission_manager-12] [INFO] [1794809486.553344151] [mission_manager]: received=7 id=feedback-1794809481-low priority=20
+[mission_manager-12] [INFO] [1794809486.594531859] [mission_manager]: accepted feedback-1794809481-low 
+[mission_manager-12] [INFO] [1794809486.594994533] [mission_manager]: cancel_requested patrol/1 preempt
+[mission_manager-12] [INFO] [1794809486.695058348] [mission_manager]: cancelled patrol/1 preempt
+[mission_manager-12] [INFO] [1794809486.695096663] [mission_manager]: TASK8_READY id=feedback-1794809481-low
+[mission_manager-12] [INFO] [1794809486.696012642] [mission_manager]: dispatched feedback-1794809481-low 
+[mission_manager-12] [INFO] [1794809486.715520314] [mission_manager]: feedback id=feedback-1794809481-low token=29 remaining=0.92 m
+[mission_manager-12] [INFO] [1794809487.752104629] [mission_manager]: feedback id=feedback-1794809481-low token=29 remaining=5.97 m
+[mission_manager-12] [INFO] [1794809488.752206356] [mission_manager]: feedback id=feedback-1794809481-low token=29 remaining=5.70 m
+[mission_manager-12] [INFO] [1794809489.802259690] [mission_manager]: feedback id=feedback-1794809481-low token=29 remaining=5.42 m
+[mission_manager-12] [INFO] [1794809490.802425187] [mission_manager]: feedback id=feedback-1794809481-low token=29 remaining=5.17 m
+[mission_manager-12] [INFO] [1794809491.802898860] [mission_manager]: feedback id=feedback-1794809481-low token=29 remaining=4.92 m
+[controller_server-5] [WARN] [1794809492.704214494] [controller_server]: Control loop missed its desired rate of 10.0000Hz
+[bt_navigator-9] [WARN] [1794809492.711331613] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
+[mission_manager-12] [INFO] [1794809492.806146872] [mission_manager]: feedback id=feedback-1794809481-low token=29 remaining=4.72 m
+[controller_server-5] [WARN] [1794809492.880981942] [controller_server]: Control loop missed its desired rate of 10.0000Hz
+[mission_manager-12] [INFO] [1794809493.288828097] [mission_manager]: received=8 id=feedback-1794809481-urgent priority=100
+[mission_manager-12] [INFO] [1794809493.293412353] [mission_manager]: accepted feedback-1794809481-urgent 
+[mission_manager-12] [INFO] [1794809493.293542348] [mission_manager]: cancel_requested feedback-1794809481-low preempt
+[mission_manager-12] [INFO] [1794809493.447374988] [mission_manager]: cancelled feedback-1794809481-low preempt
+[mission_manager-12] [INFO] [1794809493.447411768] [mission_manager]: TASK8_READY id=feedback-1794809481-urgent
+[mission_manager-12] [INFO] [1794809493.447507609] [mission_manager]: dispatched feedback-1794809481-urgent 
+[mission_manager-12] [INFO] [1794809493.454731726] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=4.55 m
+[mission_manager-12] [INFO] [1794809494.501853654] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=6.97 m
+[mission_manager-12] [INFO] [1794809495.503094822] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=6.77 m
+[mission_manager-12] [INFO] [1794809496.551770326] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=6.52 m
+[mission_manager-12] [INFO] [1794809497.602792449] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=6.20 m
+[mission_manager-12] [INFO] [1794809498.602935097] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=5.95 m
+[mission_manager-12] [INFO] [1794809499.651341377] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=5.67 m
+[mission_manager-12] [INFO] [1794809500.651359348] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=5.40 m
+[mission_manager-12] [INFO] [1794809501.651616322] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=5.15 m
+[mission_manager-12] [INFO] [1794809502.701912024] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=4.87 m
+[mission_manager-12] [INFO] [1794809503.703334553] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=4.62 m
+[mission_manager-12] [INFO] [1794809504.754563682] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=4.35 m
+[mission_manager-12] [INFO] [1794809505.801859116] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=4.07 m
+[mission_manager-12] [INFO] [1794809506.803118664] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=3.80 m
+[mission_manager-12] [INFO] [1794809507.851402783] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=3.52 m
+[mission_manager-12] [INFO] [1794809508.851529859] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=3.27 m
+[mission_manager-12] [INFO] [1794809509.851596747] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=3.02 m
+[mission_manager-12] [INFO] [1794809510.851926967] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=2.75 m
+[mission_manager-12] [INFO] [1794809511.902574020] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=2.47 m
+[mission_manager-12] [INFO] [1794809512.951418559] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=2.22 m
+[mission_manager-12] [INFO] [1794809513.951490344] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=1.95 m
+[mission_manager-12] [INFO] [1794809514.951499085] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=1.70 m
+[mission_manager-12] [INFO] [1794809516.001843260] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=1.42 m
+[mission_manager-12] [INFO] [1794809517.002169231] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=1.17 m
+[mission_manager-12] [INFO] [1794809518.002806468] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=0.90 m
+[mission_manager-12] [INFO] [1794809519.002857968] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=0.65 m
+[mission_manager-12] [INFO] [1794809520.051602668] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=0.37 m
+[mission_manager-12] [INFO] [1794809521.054541701] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=0.22 m
+[mission_manager-12] [INFO] [1794809522.101781244] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=0.21 m
+[mission_manager-12] [INFO] [1794809523.103190287] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=0.21 m
+[mission_manager-12] [INFO] [1794809524.151414812] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=0.21 m
+[mission_manager-12] [INFO] [1794809524.992679396] [mission_manager]: arrived feedback-1794809481-urgent 
+[mission_manager-12] [INFO] [1794809527.992562255] [mission_manager]: completed feedback-1794809481-urgent 
+[mission_manager-12] [INFO] [1794809528.042519291] [mission_manager]: TASK8_READY id=feedback-1794809481-low
+[mission_manager-12] [INFO] [1794809528.042662616] [mission_manager]: dispatched feedback-1794809481-low 
+[mission_manager-12] [INFO] [1794809528.046558213] [mission_manager]: feedback id=feedback-1794809481-low token=31 remaining=0.21 m
+[mission_manager-12] [INFO] [1794809529.094386638] [mission_manager]: feedback id=feedback-1794809481-low token=31 remaining=5.65 m
+[mission_manager-12] [INFO] [1794809530.143828001] [mission_manager]: feedback id=feedback-1794809481-low token=31 remaining=5.37 m
+
 ```
 
+### 本次验证结论（2026-11-16 核对）
 
+- 报警导航：`feedback-1794808893-low` 的 token=17 连续输出距离，随后到达、约 3 秒后完成，符合预期。
+- 暂停恢复：`feedback-1794809315-low` 暂停前 token=25，取消后重新排队（queue_size=1），恢复后同一 ID 使用 token=26；记录片段中暂停后不再输出 token=25。
+- 高优先级抢占：低优先级 token=29 → 取消旧导航 → 紧急任务 token=30 → 紧急任务到达并完成 → 恢复原低优先级任务 token=31。该片段中的任务 ID 与编号切换符合预期。
+- 限频：按同一 ID/token 分组，相邻反馈日志间隔约 1.000～1.051 秒，符合清理前每秒最多输出一次的设置。
+- 记录边界：暂停恢复和抢占恢复后的低优先级报警尚未附上最终到达、完成输出；未专门注入迟到反馈验证过滤分支，不把片段外结果写成已完成。
 
+反馈距离在新导航开始时出现上升，不据此判定任务身份混乱。Nav2 按当前路径计算剩余距离，路径更新时数值可能增大；具体每次跳变的原因尚未单独核实。[Nav2 Humble 实现](https://github.com/ros-navigation/navigation2/blob/humble/nav2_bt_navigator/src/navigators/navigate_to_pose.cpp)
 
+### 日志清理后的查看方式
 
+删除 `TASK8_READY`、`TASK8_FEEDBACK_RECEIVED` 临时标记。报警反馈仍每秒一次，普通巡逻改为每五秒一次；重复接收计数和巡逻到达/完成日志改为 DEBUG。任务话题和 CSV 继续保留完整事件。
+
+默认启动时 Nav2 只显示 ERROR 及以上日志；开启 WARN 可检查本轮出现过的控制频率、行为树超时等警告。减少显示内容并不表示这些问题已经修复。
+
+```bash
+# 同步修改后，在 Ubuntu 编译并重启主系统
+cd ~/ROS2_patrol_robot
+source /opt/ros/humble/setup.bash
+colcon build --packages-up-to patrol_manager patrol_bringup --symlink-install \
+  --cmake-args -DBUILD_TESTING=ON
+source install/setup.bash
+bash scripts/run.sh rviz:=false
+
+# 需要诊断时，先退出旧系统，再用此命令重启
+bash scripts/run.sh rviz:=false nav_log_level:=warn mission_log_level:=debug
+```

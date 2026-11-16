@@ -95,7 +95,14 @@ bash scripts/run.sh
 bash scripts/run.sh rviz:=false
 ```
 
-终端默认保留任务派发、到达、完成和网页地址，基础节点只输出警告及以上日志。
+终端默认保留巡逻派发、报警过程、暂停/抢占和网页地址；报警距离反馈每秒一次，普通巡逻每五秒一次。重复接收计数及普通巡逻的到达/完成日志放在 DEBUG，完整任务事件仍发布到 `/patrol/records` 并写入 CSV。Nav2 默认只显示 ERROR 及以上日志，速度门禁等其他基础节点保留 WARN。
+
+需要查看 Nav2 警告和完整任务日志时：
+
+```bash
+bash scripts/run.sh rviz:=false nav_log_level:=warn mission_log_level:=debug
+```
+
 关闭时按一次 `Ctrl+C`：脚本会先暂停任务、等待当前导航终结，再通过生命周期管理器关闭 Nav2，最后退出进程；通常需要几秒。
 请通过 `scripts/run.sh` 启动以使用这套退出顺序，直接运行 `ros2 launch` 不经过该保护。
 
@@ -109,7 +116,7 @@ colcon build --symlink-install --packages-select patrol_manager patrol_sim patro
 bash scripts/run.sh rviz:=false
 ```
 
-若将来仍出现 `Control loop missed its desired rate`，应检查虚拟机负载；行为树已改为 20 Hz，底盘控制仍为 10 Hz，这类性能警告会继续保留。
+开启 `nav_log_level:=warn` 后，若出现 `Control loop missed its desired rate`，应检查虚拟机负载；行为树为 20 Hz，底盘控制为 10 Hz。日志级别只控制显示，不会修复控制超时或恢复错误。
 
 **Gazebo 模式：**
 

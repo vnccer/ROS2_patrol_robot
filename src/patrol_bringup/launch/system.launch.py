@@ -27,12 +27,15 @@ def setup(context):
     def node(pkg, executable, name=None, parameters=None, **kw):
         node_name = name or executable
 
-        # 任务进展和网页地址保留INFO，其余节点只显示警告及以上信息
-        log_level =(
-            'info'
-            if node_name in ('mission_manager','control_panel')
-            else 'warn'
-        )
+        # 主终端保留任务进展；Nav2 默认显示错误，诊断时可开启警告。
+        if node_name == 'mission_manager':
+            log_level = LaunchConfiguration('mission_log_level').perform(context)
+        elif pkg.startswith('nav2_'):
+            log_level = LaunchConfiguration('nav_log_level').perform(context)
+        elif node_name == 'control_panel':
+            log_level = 'info'
+        else:
+            log_level = 'warn'
 
         return Node(
             package=pkg,
@@ -107,6 +110,12 @@ def generate_launch_description():
         DeclareLaunchArgument('rviz',default_value='true'),
         DeclareLaunchArgument('gui',default_value='false',description='Gazebo GUI; headless is easier on VMware'),
         DeclareLaunchArgument('panel',default_value='true'),
+        DeclareLaunchArgument('mission_log_level',default_value='info',
+            choices=['debug','info','warn','error','fatal'],
+            description='Mission logs; debug includes receipt counts and patrol completion'),
+        DeclareLaunchArgument('nav_log_level',default_value='error',
+            choices=['debug','info','warn','error','fatal'],
+            description='Nav2 logs; warn includes timing and recovery warnings'),
         DeclareLaunchArgument('mission',default_value=str(root/'config/mission.yaml')),
         DeclareLaunchArgument('nav_params',default_value=str(root/'config/nav2.yaml')),
         OpaqueFunction(function=setup)])
