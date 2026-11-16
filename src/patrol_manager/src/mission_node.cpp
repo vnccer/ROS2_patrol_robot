@@ -235,6 +235,7 @@ private:
       handle_.reset(); mission_->result(token,r.code==rclcpp_action::ResultCode::SUCCEEDED,wall_now());
     };
     options.feedback_callback=[this,token,task_id](Handle::SharedPtr,std::shared_ptr<const Nav::Feedback> feedback){
+      RCLCPP_INFO_ONCE(get_logger(), "TASK8_FEEDBACK_RECEIVED");
       // 只观察当前仍在执行、且没有进入取消流程的导航
       if(token!=mission_->token || !mission_->flying || mission_->cancelling || !mission_->active){return;}
       // 同一次导航，两条反馈日志至少间隔1s
@@ -249,6 +250,7 @@ private:
         static_cast<double>(feedback->distance_remaining)
       );
     };
+    RCLCPP_INFO(get_logger(), "TASK8_READY id=%s", task_id.c_str());
     try {nav_->async_send_goal(goal,options);}
     catch(const std::exception &err) {
       mission_->result(token,false,wall_now()); mission_->trip(err.what(),wall_now());

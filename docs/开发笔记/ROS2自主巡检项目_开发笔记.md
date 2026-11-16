@@ -432,7 +432,7 @@ fault: ''
 
 ## 任务 8：为 Nav2 目标增加反馈观察
 
-**目标：****导航过程中，打印当前任务、此次导航的编号和剩余距离，并控制日志频率**
+**目标：**导航过程中，打印当前任务、此次导航的编号和剩余距离，并控制日志频率**
 
 **输入：** 
 
@@ -441,3 +441,258 @@ fault: ''
 **输出：** 
 
 **怎么验证成功：** 
+
+```
+#终端C
+donk@ubuntu:~/ROS2_patrol_robot$ run_id="feedback-$(date +%s)"
+donk@ubuntu:~/ROS2_patrol_robot$ ros2 topic pub --once /patrol/incidents patrol_interfaces/msg/Incident \
+> "{id: ${run_id}-low, priority: 20, target: {header: {frame_id: map}, pose: {position: {x: 7.0, y: 7.0}, orientation: {w: 1.0}}}, ttl_sec: 600.0, handling_sec: 3.0}"
+Waiting for at least 1 matching subscription(s)...
+publisher: beginning loop
+publishing #1: patrol_interfaces.msg.Incident(id='feedback-1794807277-low', priority=20, target=geometry_msgs.msg.PoseStamped(header=std_msgs.msg.Header(stamp=builtin_interfaces.msg.Time(sec=0, nanosec=0), frame_id='map'), pose=geometry_msgs.msg.Pose(position=geometry_msgs.msg.Point(x=7.0, y=7.0, z=0.0), orientation=geometry_msgs.msg.Quaternion(x=0.0, y=0.0, z=0.0, w=1.0))), ttl_sec=600.0, handling_sec=3.0, description='')
+
+#终端B
+---
+stamp:
+  sec: 1794807311
+  nanosec: 250859036
+monotonic_sec: 4233.852046921
+kind: dispatched
+task_id: feedback-1794807277-low
+detail: ''
+value: 0.13640745900011098
+---
+stamp:
+  sec: 1794807338
+  nanosec: 196814140
+monotonic_sec: 4260.798235827
+kind: arrived
+task_id: feedback-1794807277-low
+detail: ''
+value: 27.042978071000107
+---
+stamp:
+  sec: 1794807341
+  nanosec: 196935061
+monotonic_sec: 4263.798367759
+kind: completed
+task_id: feedback-1794807277-low
+detail: ''
+value: 0.0
+---
+
+#终端A
+[mission_manager-12] [INFO] [1794807311.114033024] [mission_manager]: received=1 id=feedback-1794807277-low priority=20
+[mission_manager-12] [INFO] [1794807311.147661058] [mission_manager]: accepted feedback-1794807277-low 
+[mission_manager-12] [INFO] [1794807311.147759084] [mission_manager]: cancel_requested patrol/1 preempt
+[mission_manager-12] [INFO] [1794807311.250793745] [mission_manager]: cancelled patrol/1 preempt
+[mission_manager-12] [INFO] [1794807311.259286228] [mission_manager]: dispatched feedback-1794807277-low 
+[mission_manager-12] [INFO] [1794807338.198329852] [mission_manager]: arrived feedback-1794807277-low 
+[mission_manager-12] [INFO] [1794807341.198285307] [mission_manager]: completed feedback-1794807277-low 
+
+```
+
+这次暂停在主系统出现报警、机器人仍在导航时
+
+```
+#终端C
+donk@ubuntu:~/ROS2_patrol_robot$ ros2 service call /patrol/set_paused \
+  std_srvs/srv/SetBool '{data: true}'
+waiting for service to become available...
+requester: making request: std_srvs.srv.SetBool_Request(data=True)
+
+response:
+std_srvs.srv.SetBool_Response(success=True, message='Pause updated; status confirms navigation cancellation.')
+
+donk@ubuntu:~/ROS2_patrol_robot$ ros2 topic echo /patrol/status --once
+stamp:
+  sec: 1794807448
+  nanosec: 804466918
+state: PAUSED
+active_id: ''
+active_priority: 0
+patrol_index: 0
+queue_size: 0
+patrol_completed: 8
+events_completed: 1
+tasks_failed: 0
+paused: true
+motion_permitted: false
+fault: ''
+---
+
+#终端B
+---
+stamp:
+  sec: 1794807425
+  nanosec: 552702089
+monotonic_sec: 4348.15391001
+kind: dispatched
+task_id: patrol/0
+detail: ''
+value: 0.0
+---
+stamp:
+  sec: 1794807428
+  nanosec: 202735001
+monotonic_sec: 4350.804155343
+kind: duplicate
+task_id: feedback-1794807277-low
+detail: ignored
+value: 0.0
+---
+stamp:
+  sec: 1794807438
+  nanosec: 560223167
+monotonic_sec: 4361.161646556
+kind: paused
+task_id: patrol/0
+detail: ''
+value: 0.0
+---
+stamp:
+  sec: 1794807438
+  nanosec: 605653725
+monotonic_sec: 4361.161646556
+kind: cancel_requested
+task_id: patrol/0
+detail: pause
+value: 0.0
+---
+stamp:
+  sec: 1794807438
+  nanosec: 802465228
+monotonic_sec: 4361.403895019
+kind: cancelled
+task_id: patrol/0
+detail: pause
+value: 0.0
+---
+
+#终端A
+[bt_navigator-9] [WARN] [1794807427.509651907] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
+[bt_navigator-9] [WARN] [1794807427.604996714] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
+[controller_server-5] [WARN] [1794807427.664340199] [controller_server]: Control loop missed its desired rate of 10.0000Hz
+[mission_manager-12] [INFO] [1794807428.182075287] [mission_manager]: received=2 id=feedback-1794807277-low priority=20
+[mission_manager-12] [INFO] [1794807428.205539281] [mission_manager]: duplicate feedback-1794807277-low ignored
+[bt_navigator-9] [WARN] [1794807438.157841142] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
+[bt_navigator-9] [WARN] [1794807438.279467815] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
+[bt_navigator-9] [WARN] [1794807438.279844548] [bt_navigator_navigate_to_pose_rclcpp_node]: Timed out while waiting for action server to acknowledge goal request for compute_path_to_pose
+[controller_server-5] [WARN] [1794807438.285246209] [controller_server]: Control loop missed its desired rate of 10.0000Hz
+[bt_navigator-9] [WARN] [1794807438.392272406] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
+[bt_navigator-9] [WARN] [1794807438.392308214] [bt_navigator_navigate_to_pose_rclcpp_node]: Node timed out while executing service call to global_costmap/clear_entirely_global_costmap.
+[controller_server-5] [WARN] [1794807438.395160874] [controller_server]: Control loop missed its desired rate of 10.0000Hz
+[mission_manager-12] [INFO] [1794807438.562630830] [mission_manager]: paused patrol/0 
+[mission_manager-12] [INFO] [1794807438.605724815] [mission_manager]: cancel_requested patrol/0 pause
+[bt_navigator-9] [WARN] [1794807438.645807840] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
+[bt_navigator-9] [ERROR] [1794807438.756476561] [bt_navigator_navigate_to_pose_rclcpp_node]: Failed to get result for compute_path_to_pose in node halt!
+[mission_manager-12] [INFO] [1794807438.803799003] [mission_manager]: cancelled patrol/0 pause
+[planner_server-7] [WARN] [1794807438.903474589] [planner_server]: Planner loop missed its desired rate of 20.0000 Hz. Current loop rate is 3.7986 Hz
+
+```
+
+接着取消暂停
+
+```
+#终端C
+donk@ubuntu:~/ROS2_patrol_robot$ ros2 service call /patrol/set_paused \
+  std_srvs/srv/SetBool '{data: false}'
+waiting for service to become available...
+requester: making request: std_srvs.srv.SetBool_Request(data=False)
+
+response:
+std_srvs.srv.SetBool_Response(success=True, message='Pause updated; status confirms navigation cancellation.')
+
+#终端B
+---
+stamp:
+  sec: 1794807657
+  nanosec: 67109875
+monotonic_sec: 4579.668546254
+kind: resumed
+task_id: ''
+detail: ''
+value: 0.0
+---
+stamp:
+  sec: 1794807657
+  nanosec: 76739215
+monotonic_sec: 4579.668546254
+kind: dispatched
+task_id: patrol/0
+detail: ''
+value: 0.0
+---
+
+#终端A
+[mission_manager-12] [INFO] [1794807657.076626211] [mission_manager]: resumed  
+[mission_manager-12] [INFO] [1794807657.098800510] [mission_manager]: dispatched patrol/0 
+[mission_manager-12] [INFO] [1794807671.512669472] [mission_manager]: arrived patrol/0 
+[mission_manager-12] [INFO] [1794807672.512935568] [mission_manager]: completed patrol/0 
+[mission_manager-12] [INFO] [1794807672.562981115] [mission_manager]: dispatched patrol/1 
+```
+
+验证高优先级抢占
+
+```
+#终端C
+ros2 topic pub --once /patrol/incidents patrol_interfaces/msg/Incident \
+"{id: ${run_id}-low, priority: 20, target: {header: {frame_id: map}, pose: {position: {x: 7.0, y: 7.0}, orientation: {w: 1.0}}}, ttl_sec: 600.0, handling_sec: 3.0}"
+#随后快速再输入
+ros2 topic pub --once /patrol/incidents patrol_interfaces/msg/Incident \
+"{id: ${run_id}-urgent, priority: 100, target: {header: {frame_id: map}, pose: {position: {x: 1.0, y: 7.0}, orientation: {w: 1.0}}}, ttl_sec: 600.0, handling_sec: 3.0}"
+
+#终端B
+---
+stamp:
+  sec: 1794807757
+  nanosec: 265652513
+monotonic_sec: 4679.867027667
+kind: duplicate
+task_id: feedback-1794807277-low
+detail: ignored
+value: 0.0
+---
+stamp:
+  sec: 1794807760
+  nanosec: 214669587
+monotonic_sec: 4682.8160825
+kind: accepted
+task_id: feedback-1794807277-urgent
+detail: ''
+value: 0.0
+---
+stamp:
+  sec: 1794807760
+  nanosec: 215919207
+monotonic_sec: 4682.8160825
+kind: cancel_requested
+task_id: patrol/0
+detail: preempt
+value: 0.0
+---
+
+
+#终端A
+[mission_manager-12] [INFO] [1794807757.227828934] [mission_manager]: received=3 id=feedback-1794807277-low priority=20
+[mission_manager-12] [INFO] [1794807757.301906731] [mission_manager]: duplicate feedback-1794807277-low ignored
+[bt_navigator-9] [WARN] [1794807757.358695415] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
+[controller_server-5] [WARN] [1794807757.456753435] [controller_server]: Control loop missed its desired rate of 10.0000Hz
+[bt_navigator-9] [WARN] [1794807757.466548006] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
+[controller_server-5] [WARN] [1794807757.478214065] [controller_server]: Control loop missed its desired rate of 10.0000Hz
+[controller_server-5] [WARN] [1794807759.706733037] [controller_server]: Control loop missed its desired rate of 10.0000Hz
+[controller_server-5] [WARN] [1794807759.787296230] [controller_server]: Control loop missed its desired rate of 10.0000Hz
+[mission_manager-12] [INFO] [1794807760.189091152] [mission_manager]: received=4 id=feedback-1794807277-urgent priority=100
+[mission_manager-12] [INFO] [1794807760.215740063] [mission_manager]: accepted feedback-1794807277-urgent 
+[mission_manager-12] [INFO] [1794807760.216024564] [mission_manager]: cancel_requested patrol/0 preempt
+[mission_manager-12] [INFO] [1794807760.318506193] [mission_manager]: cancelled patrol/0 preempt
+[mission_manager-12] [INFO] [1794807760.321651459] [mission_manager]: dispatched feedback-1794807277-urgent 
+[mission_manager-12] [INFO] [1794807769.064369688] [mission_manager]: arrived feedback-1794807277-urgent 
+[mission_manager-12] [INFO] [1794807772.063549856] [mission_manager]: completed feedback-1794807277-urgent 
+[mission_manager-12] [INFO] [1794807772.115139588] [mission_manager]: dispatched patrol/0
+```
+
+
+
+
+
