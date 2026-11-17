@@ -32,7 +32,7 @@ def setup(context):
             log_level = LaunchConfiguration('mission_log_level').perform(context)
         elif pkg.startswith('nav2_'):
             log_level = LaunchConfiguration('nav_log_level').perform(context)
-        elif node_name == 'control_panel':
+        elif node_name in ('control_panel', 'patrol_node'):
             log_level = 'info'
         else:
             log_level = 'warn'
@@ -95,6 +95,7 @@ def setup(context):
                   'use_sim_time':sim_time,'autostart':True,'node_names':lifecycle}]),
               node('patrol_manager','mission_manager',parameters=[mission_path,{'use_sim_time':sim_time}]),
               node('patrol_sim','velocity_guard',parameters=[{'use_sim_time':sim_time}])]
+    nodes.append(node('patrol_manager', 'patrol_node', parameters=[{'use_sim_time': sim_time}]))
     if LaunchConfiguration('panel').perform(context).lower()=='true':
         nodes.append(node('patrol_sim','control_panel',parameters=[{'use_sim_time':sim_time,
                      'waypoints':mission['waypoints']}]))

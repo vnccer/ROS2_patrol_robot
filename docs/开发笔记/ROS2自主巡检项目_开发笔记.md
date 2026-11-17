@@ -473,12 +473,14 @@ fault: ''
 
 **输出：** 主系统终端显示 `feedback id=... token=... remaining=... m`。
 
-**怎么验证成功：** 以下为本次实测原始记录；记录产生于日志清理前，保留当时的临时标记和警告。
+**怎么验证成功：** 
 
 输入一次low级别的报警事件，看终端是否显示
 
 ```BASH
-#终端B
+# 终端B
+# ros2 topic pub --once 话题名称 消息类型 "消息内容"
+# Incident对应/src/patrol_interfaces/msg/Incident.msg
 run_id="feedback-$(date +%s)"
 ros2 topic pub --once /patrol/incidents patrol_interfaces/msg/Incident "{id: ${run_id}-low, priority: 20, target: {header: {frame_id: map}, pose: {position: {x: 7.0, y: 7.0}, orientation: {w: 1.0}}}, ttl_sec: 600.0, handling_sec: 3.0}"
 
@@ -555,7 +557,6 @@ fault: ''
 [bt_navigator-9] [ERROR] [1794809348.586588147] [bt_navigator_navigate_to_pose_rclcpp_node]: Failed to get result for follow_path in node halt!
 [mission_manager-12] [INFO] [1794809348.604333325] [mission_manager]: cancelled feedback-1794809315-low pause
 [controller_server-5] [WARN] [1794809348.619251957] [controller_server]: Control loop missed its desired rate of 10.0000Hz
-
 ```
 
 接着取消暂停
@@ -569,7 +570,6 @@ ros2 service call /patrol/set_paused std_srvs/srv/SetBool '{data: false}'
 [mission_manager-12] [INFO] [1794809398.353250821] [mission_manager]: TASK8_READY id=feedback-1794809315-low
 [mission_manager-12] [INFO] [1794809398.353310520] [mission_manager]: dispatched feedback-1794809315-low 
 [mission_manager-12] [INFO] [1794809398.415745035] [mission_manager]: feedback id=feedback-1794809315-low token=26 remaining=6.52 m
-
 ```
 
 验证高优先级抢占
@@ -592,9 +592,6 @@ ros2 topic pub --once /patrol/incidents patrol_interfaces/msg/Incident "{id: ${r
 [mission_manager-12] [INFO] [1794809486.715520314] [mission_manager]: feedback id=feedback-1794809481-low token=29 remaining=0.92 m
 [mission_manager-12] [INFO] [1794809487.752104629] [mission_manager]: feedback id=feedback-1794809481-low token=29 remaining=5.97 m
 [mission_manager-12] [INFO] [1794809488.752206356] [mission_manager]: feedback id=feedback-1794809481-low token=29 remaining=5.70 m
-[mission_manager-12] [INFO] [1794809489.802259690] [mission_manager]: feedback id=feedback-1794809481-low token=29 remaining=5.42 m
-[mission_manager-12] [INFO] [1794809490.802425187] [mission_manager]: feedback id=feedback-1794809481-low token=29 remaining=5.17 m
-[mission_manager-12] [INFO] [1794809491.802898860] [mission_manager]: feedback id=feedback-1794809481-low token=29 remaining=4.92 m
 [controller_server-5] [WARN] [1794809492.704214494] [controller_server]: Control loop missed its desired rate of 10.0000Hz
 [bt_navigator-9] [WARN] [1794809492.711331613] [BehaviorTreeEngine]: Behavior Tree tick rate 20.00 was exceeded!
 [mission_manager-12] [INFO] [1794809492.806146872] [mission_manager]: feedback id=feedback-1794809481-low token=29 remaining=4.72 m
@@ -608,34 +605,7 @@ ros2 topic pub --once /patrol/incidents patrol_interfaces/msg/Incident "{id: ${r
 [mission_manager-12] [INFO] [1794809493.454731726] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=4.55 m
 [mission_manager-12] [INFO] [1794809494.501853654] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=6.97 m
 [mission_manager-12] [INFO] [1794809495.503094822] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=6.77 m
-[mission_manager-12] [INFO] [1794809496.551770326] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=6.52 m
-[mission_manager-12] [INFO] [1794809497.602792449] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=6.20 m
-[mission_manager-12] [INFO] [1794809498.602935097] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=5.95 m
-[mission_manager-12] [INFO] [1794809499.651341377] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=5.67 m
-[mission_manager-12] [INFO] [1794809500.651359348] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=5.40 m
-[mission_manager-12] [INFO] [1794809501.651616322] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=5.15 m
-[mission_manager-12] [INFO] [1794809502.701912024] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=4.87 m
-[mission_manager-12] [INFO] [1794809503.703334553] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=4.62 m
-[mission_manager-12] [INFO] [1794809504.754563682] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=4.35 m
-[mission_manager-12] [INFO] [1794809505.801859116] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=4.07 m
-[mission_manager-12] [INFO] [1794809506.803118664] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=3.80 m
-[mission_manager-12] [INFO] [1794809507.851402783] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=3.52 m
-[mission_manager-12] [INFO] [1794809508.851529859] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=3.27 m
-[mission_manager-12] [INFO] [1794809509.851596747] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=3.02 m
-[mission_manager-12] [INFO] [1794809510.851926967] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=2.75 m
-[mission_manager-12] [INFO] [1794809511.902574020] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=2.47 m
-[mission_manager-12] [INFO] [1794809512.951418559] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=2.22 m
-[mission_manager-12] [INFO] [1794809513.951490344] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=1.95 m
-[mission_manager-12] [INFO] [1794809514.951499085] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=1.70 m
-[mission_manager-12] [INFO] [1794809516.001843260] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=1.42 m
-[mission_manager-12] [INFO] [1794809517.002169231] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=1.17 m
-[mission_manager-12] [INFO] [1794809518.002806468] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=0.90 m
-[mission_manager-12] [INFO] [1794809519.002857968] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=0.65 m
-[mission_manager-12] [INFO] [1794809520.051602668] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=0.37 m
-[mission_manager-12] [INFO] [1794809521.054541701] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=0.22 m
-[mission_manager-12] [INFO] [1794809522.101781244] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=0.21 m
-[mission_manager-12] [INFO] [1794809523.103190287] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=0.21 m
-[mission_manager-12] [INFO] [1794809524.151414812] [mission_manager]: feedback id=feedback-1794809481-urgent token=30 remaining=0.21 m
+
 [mission_manager-12] [INFO] [1794809524.992679396] [mission_manager]: arrived feedback-1794809481-urgent 
 [mission_manager-12] [INFO] [1794809527.992562255] [mission_manager]: completed feedback-1794809481-urgent 
 [mission_manager-12] [INFO] [1794809528.042519291] [mission_manager]: TASK8_READY id=feedback-1794809481-low
@@ -643,7 +613,6 @@ ros2 topic pub --once /patrol/incidents patrol_interfaces/msg/Incident "{id: ${r
 [mission_manager-12] [INFO] [1794809528.046558213] [mission_manager]: feedback id=feedback-1794809481-low token=31 remaining=0.21 m
 [mission_manager-12] [INFO] [1794809529.094386638] [mission_manager]: feedback id=feedback-1794809481-low token=31 remaining=5.65 m
 [mission_manager-12] [INFO] [1794809530.143828001] [mission_manager]: feedback id=feedback-1794809481-low token=31 remaining=5.37 m
-
 ```
 
 ### 本次验证结论（2026-11-16 核对）
@@ -652,9 +621,6 @@ ros2 topic pub --once /patrol/incidents patrol_interfaces/msg/Incident "{id: ${r
 - 暂停恢复：`feedback-1794809315-low` 暂停前 token=25，取消后重新排队（queue_size=1），恢复后同一 ID 使用 token=26；记录片段中暂停后不再输出 token=25。
 - 高优先级抢占：低优先级 token=29 → 取消旧导航 → 紧急任务 token=30 → 紧急任务到达并完成 → 恢复原低优先级任务 token=31。该片段中的任务 ID 与编号切换符合预期。
 - 限频：按同一 ID/token 分组，相邻反馈日志间隔约 1.000～1.051 秒，符合清理前每秒最多输出一次的设置。
-- 记录边界：暂停恢复和抢占恢复后的低优先级报警尚未附上最终到达、完成输出；未专门注入迟到反馈验证过滤分支，不把片段外结果写成已完成。
-
-反馈日志的任务 ID/token 切换正确，但这不足以证明首帧距离有效。后续观察到多个新目标首帧重复上一段末尾的 0.几米；新目标初始化与新路径生成之间可能仍读到缓存路径，因此原始首帧距离不能直接用作当前目标的有效估计。[Nav2 Humble 实现](https://github.com/ros-navigation/navigation2/blob/humble/nav2_bt_navigator/src/navigators/navigate_to_pose.cpp)
 
 ### 日志清理后的查看方式
 
@@ -663,14 +629,6 @@ ros2 topic pub --once /patrol/incidents patrol_interfaces/msg/Incident "{id: ${r
 默认启动时 Nav2 只显示 ERROR 及以上日志；开启 WARN 可检查本轮出现过的控制频率、行为树超时等警告。减少显示内容并不表示这些问题已经修复。
 
 ```bash
-# 同步修改后，在 Ubuntu 编译并重启主系统
-cd ~/ROS2_patrol_robot
-source /opt/ros/humble/setup.bash
-colcon build --packages-up-to patrol_manager patrol_bringup --symlink-install \
-  --cmake-args -DBUILD_TESTING=ON
-source install/setup.bash
-bash scripts/run.sh rviz:=false
-
 # 需要诊断时，先退出旧系统，再用此命令重启
 bash scripts/run.sh rviz:=false nav_log_level:=warn mission_log_level:=debug
 ```
@@ -682,20 +640,144 @@ bash scripts/run.sh rviz:=false nav_log_level:=warn mission_log_level:=debug
 - 使用这条路径与 Action 反馈中的当前位置，计算到路径投影点的连接距离及后续路径长度。位置时间戳必须不早于该路径生成时间。
 - 尚未拿到当前路径或对应位置时，只输出一次 `remaining=WAITING_FOR_CURRENT_PLAN`；有效数字首次出现不必等待巡逻的 5 秒限频周期。
 - 数字日志标注 `source=current_plan`，属于本节点基于当前规划的路径距离估计；原始 Nav2 数值仅在 DEBUG 的 `feedback_raw ... nav_remaining=...` 中保留。`/plan` 没有 Action UUID，当前项目用时间、坐标系和终点关联目标。
-- 到达、完成、取消及任务调度继续使用原有 Action 结果；显示的距离不参与这些决策。原始实验输出保留，以上修复尚不能记录为 Ubuntu 实测通过。
-- 本地 C++ 回归：新增路径距离测试 41 次检查通过，原有任务核心 60 次检查通过；这不是 Ubuntu/Nav2 的集成实测结果。
+- 到达、完成、取消及任务调度继续使用原有 Action 结果；显示的距离不参与这些决策。
+
+## 任务 9：完成调试与回归交付
+
+**目标：**看清程序怎么运行，并让验证过程能够重复，这里选择分步骤验证的方式进行实验。
+
+**第一步：**用GDB观察一次撤销
+
+调试对象：`mission.hpp`的`cancel_pending (line 79)`，其业务是：找到排队任务，撤销它，记录撤销，找不到则返回失败。
 
 ```bash
-# 同步新头文件、测试、CMake 和节点源码后，在 Ubuntu 执行
-cd ~/ROS2_patrol_robot
-source /opt/ros/humble/setup.bash
+# 构建Debug版本
+colcon build --symlink-install --packages-up-to patrol_manager --cmake-args -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Debug
 source install/setup.bash
-colcon build --packages-select patrol_manager --symlink-install \
-  --cmake-args -DBUILD_TESTING=ON
-source install/setup.bash
-colcon test --packages-select patrol_manager --event-handlers console_direct+
-colcon test-result --verbose
-bash scripts/run.sh rviz:=false
+
+# 调试核心测试程序
+gdb build/patrol_manager/test_mission
+break patrol::Mission::cancel_pending
 ```
 
-复测相隔较远的巡逻点，确认先等待或直接输出合理的新路径距离；暂停恢复和抢占后应使用新 token 重新等待新路径。等待状态只报告一次，不应把旧数值反复打印成新任务的剩余距离。
+第一次调用
+
+```bash
+# 对应test_mission.cpp中的：m=make();
+# 第一次停在断点m.cancel_pending("missing")
+run
+print id
+	$1 = "missing"
+print queue
+	$2 = std::vector of length 0, capacity 0
+```
+
+第二次调用
+
+```bash
+# 对应test_mission.cpp中的：m=mak();m.submit(event("a",20),0);m.submit(event("b",80),0);m.submit(event("c",20),0);
+# 第二次停在断点m.cancel_pending("missing")
+# 让当前这一次函数调用执行完，返回调用它的位置，并显示返回值
+# 继续执行整个程序，直到再次遇到断点、程序结束或其他停止事件
+finish
+Run till exit from #0  patrol::Mission::cancel_pending (this=0x7fffffffd7a0, id="missing")
+    at /home/donk/ROS2_patrol_robot/src/patrol_manager/include/patrol_manager/mission.hpp:79
+0x00005555555588f2 in main () at /home/donk/ROS2_patrol_robot/src/patrol_manager/test/test_mission.cpp:70
+70	      check(!m.cancel_pending("missing"),"empty queue cancellation returns false");
+Value returned is $5 = false
+
+continue
+print id
+$6 = "missing"
+print queue
+    $7 = std::vector of length 3, capacity 4 = {{id = "a", pose = {x = 2, y = 2, yaw = 0}, priority = 20, event = true, received = 0, expires = 100, 
+        handling = 1, retries = 0, order = 1}, {id = "b", pose = {x = 2, y = 2, yaw = 0}, priority = 80, event = true, received = 0, expires = 100, 
+        handling = 1, retries = 0, order = 2}, {id = "c", pose = {x = 2, y = 2, yaw = 0}, priority = 20, event = true, received = 0, expires = 100, 
+        handling = 1, retries = 0, order = 3}}
+```
+
+第三次调用
+
+```bash
+# 第三次停在断点cancel_pending("b")，进入删除B的流程
+finish
+Run till exit from #0  patrol::Mission::cancel_pending (this=0x7fffffffd7a0, id="missing")
+    at /home/donk/ROS2_patrol_robot/src/patrol_manager/include/patrol_manager/mission.hpp:79
+0x0000555555558be0 in main () at /home/donk/ROS2_patrol_robot/src/patrol_manager/test/test_mission.cpp:74
+74	      check(!m.cancel_pending("missing"),"unknown ID returns false");
+Value returned is $8 = false
+
+conitune
+print id
+    $9 = "b"
+print queue
+    $10 = std::vector of length 3, capacity 4 = {{id = "a", pose = {x = 2, y = 2, yaw = 0}, priority = 20, event = true, received = 0, expires = 100, 
+        handling = 1, retries = 0, order = 1}, {id = "b", pose = {x = 2, y = 2, yaw = 0}, priority = 80, event = true, received = 0, expires = 100, 
+        handling = 1, retries = 0, order = 2}, {id = "c", pose = {x = 2, y = 2, yaw = 0}, priority = 20, event = true, received = 0, expires = 100, 
+        handling = 1, retries = 0, order = 3}}
+
+# 逐条next，走过queue.erase(it)后查看
+print queue
+    $12 = std::vector of length 2, capacity 4 = {{id = "a", pose = {x = 2, y = 2, yaw = 0}, priority = 20, event = true, received = 0, expires = 100, 
+        handling = 1, retries = 0, order = 1}, {id = "c", pose = {x = 2, y = 2, yaw = 0}, priority = 20, event = true, received = 0, expires = 100, 
+        handling = 1, retries = 0, order = 3}}
+
+# finish
+finish
+    Run till exit from #0  patrol::Mission::cancel_pending (this=0x7fffffffd7a0, id="b")
+        at /home/donk/ROS2_patrol_robot/src/patrol_manager/include/patrol_manager/mission.hpp:84
+    0x0000555555558d5d in main () at /home/donk/ROS2_patrol_robot/src/patrol_manager/test/test_mission.cpp:78
+    78	      check(m.cancel_pending("b"),"cancel middle pending event");
+    Value returned is $13 = true
+```
+
+**第二步：**让观察节点随系统一起启动
+
+`system.launch.py (line 94)`，在`setup()`中，`nodes += [...]`后加入如下代码，让Launch负责按配置启动和管理这些进程
+
+```python
+nodes.append(node('patrol_manager', 'patrol_node', parameters=[{'use_sim_time': sim_time}]))
+# patrol_manager：程序所在的包。
+# patrol_node：CMake 构建并安装的可执行文件。
+# parameters：启动时传给节点的参数。
+```
+
+`system.launch.py (line 35)`，将`patrol_node`普通节点设置成INFO等级日志
+
+```python
+elif node_name in ('control_panel', 'patrol_node'):
+```
+
+**第三步：**把手工撤销过程写成自动验收
+
+`tools\ros_acceptance.py`
+
+`Acceptance()`类增加`cancel_pending(self, ident)`，等服务 → 填请求 → 发请求 → 等响应 → 返回结果
+`incident()`增加可选TTL，避免较长测试中等待自然任务自然过期
+加入验收方法`check_pending_cancellation(self, suffix)`
+并在`run()`中调用验收方法`self.check_pending_cancellation(suffix)`，并且在返回结果的`cases`列表中补上如下：
+
+```python
+'pending cancellation',
+'repeated and unknown cancellation rejected',
+'active task protected',
+'remaining FIFO preserved',
+'cancelled incident not dispatched',
+```
+
+`main()`的`try`与`finally`之间增加如下，失败原因也会写入原有的`ros_acceptance.json`，终端仍保留异常调用栈
+
+```python
+except Exception as error:
+    result = {'result': 'FAIL', 'error': str(error)}
+    raise
+```
+
+
+
+
+
+
+
+
+
