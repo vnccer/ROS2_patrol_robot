@@ -773,11 +773,181 @@ except Exception as error:
     raise
 ```
 
+**第四步：**构建、验证
 
+构建
 
+```
+colcon build --symlink-install --cmake-args -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Debug
+source install/setup.bash
+colcon test --packages-select patrol_manager --event-handlers console_direct+
+colcon test-result --verbose
+```
 
+终端A启动系统
 
+```
+bash scripts/run.sh rviz:=false panel:=false
+```
 
+终端B检查观察节点
 
+```
+source install/setup.bash
 
+ros2 node list
+...
+/mission_manager
+/patrol_node
+/robot_state_publisher
+...
 
+ros2 topic info /patrol/summary
+Type: std_msgs/msg/String
+Publisher count: 1
+Subscription count: 0
+
+ros2 topic echo /patrol/summary --once
+data: state=PATROLLING active_id=patrol/2 queue_size=0 received=3374
+---
+```
+
+在刚启动、没有额外手工报警的系统上运行：
+
+```
+ros2 service call /patrol/monitor/reset_count std_srvs/srv/Trigger "{}"
+```
+
+系统中运行
+
+```
+python3 tools/ros_acceptance.py
+{
+  "result": "PASS",
+  "backend": "ROS2 Humble / real Nav2 / lightweight simulator",
+  "cases": [
+    "startup",
+    "event preemption",
+    "event completion",
+    "nested resume",
+    "deduplication",
+    "patrol restore",
+    "odometry timeout",
+    "zero velocity",
+    "latched recovery",
+    "pause preserved",
+    "pending cancellation",
+    "repeated and unknown cancellation rejected",
+    "active task protected",
+    "remaining FIFO preserved",
+    "cancelled incident not dispatched"
+  ]
+}
+
+cat test_results/ros_acceptance.json
+```
+
+## 任务 1~9复盘
+
+**围绕一个现有的巡检系统，增加观察能力、撤销能力，并验证了自己的修改。**
+
+`mission_manager`负责调度：接收报警、安排任务、调用Nav2导航、处理暂停与抢占。
+`patrol_node`负责观察：接收调度员发布的状态，统计消息次数、发布摘要，提供统计清零服务。
+
+```
+报警消息 ──→ mission_manager ──→ Nav2 执行导航
+                    │                 │
+                    │ ←── 反馈、结果 ─┘
+                    │
+                    └── 发布 /patrol/status
+                                  │
+                                  ▼
+                             patrol_node
+                                  │
+                                  └── 发布 /patrol/summary
+```
+
+| 任务 | 你实际做了什么                                   | 学到的开发能力                      |
+| ---- | ------------------------------------------------ | ----------------------------------- |
+| 1～2 | 给调度员增加接警计数，把接警代码整理成成员函数   | 修改已有 C++ 类，组织回调与成员状态 |
+| 3～5 | 编写观察员：订阅状态、定时发布摘要、提供清零服务 | 独立组织一个 ROS2 C++ 节点          |
+| 6～7 | 给调度员增加“撤销等待报警”的业务函数和服务接口   | 把一个需求贯通到业务、接口和通信    |
+| 8    | 观察 Nav2 导航进展，控制日志频率，辨别旧目标反馈 | 处理异步回调和任务身份              |
+| 9    | 接入统一启动，使用 GDB，补自动验收并跑回归       | 调试、集成和验证修改                |
+
+---
+
+**调用链一：观察系统**
+
+```
+mission_manager 发布状态
+        ↓ Topic
+patrol_node 收到状态
+        ↓
+更新计数、保存最新状态
+        ↓ Timer 每秒触发
+	发布摘要
+```
+
+一个节点收到数据后，可以保存下来，供后续回调使用。
+所以计数、最新状态、订阅器、定时器都放在类的成员中。它们要跟着节点长期存在。
+清零服务只是把这个观察员的计数归零；巡检任务仍然继续运行。
+
+**调用链二：撤销等待报警**
+
+假设系统已暂停，队列中有A、B、C，请求撤销B
+
+```
+终端或验收脚本发送请求：id=B
+        ↓ ROS2 Service
+mission_node.cpp 的服务回调收到请求
+        ↓ 普通 C++ 函数调用
+mission_->cancel_pending("B")
+        ↓
+查找队列，删除 B，生成撤销记录
+        ↓
+服务返回 success=true
+```
+
+`.srv` 文件约定双方传什么。
+服务回调接收请求、填写响应。
+`cancel_pending()` 实现具体业务规则。
+ROS2 负责把请求送到，C++ 业务函数负责决定怎么处理。
+也正因为业务函数可以单独调用，才能通过 `test_mission` 和 GDB，在没有启动整套导航系统时检查删除逻辑。
+
+**调用链三：执行导航**
+
+```
+调度员选中任务
+        ↓ 发送 Action Goal
+Nav2 开始导航
+        ├── 多次 Feedback：现在走到哪里了
+        └── 一次最终 Result：这次导航怎样结束
+```
+
+我在任务 8 中接触到的难点是：发出请求的时间，与反馈到达的时间不同。
+
+比如旧任务的反馈到达时，系统可能已经开始处理下一次派发。所以需要用 token 检查“这条反馈属于哪一次导航”，再决定是否显示。
+
+这就是异步开发中的一个核心问题：处理消息前，先确认它现在是否仍然有效。
+
+---
+
+**任务9：将以上工作收成开发闭环**
+
+提出预期 → 修改代码 → 构建 → 调试 → 运行验收 → 检查原功能
+
+| 验证方式      | 回答的问题                                 |
+| ------------- | ------------------------------------------ |
+| 核心测试      | 队列删除、返回值等业务规则是否正确？       |
+| GDB           | 程序实际走了哪个分支，变量如何变化？       |
+| ROS2 运行验收 | 请求能否经过真实通信到达业务函数？         |
+| 回归测试      | 新修改是否影响原有抢占、暂停、恢复等行为？ |
+
+---
+
+因此做过的内容，可以如下表述：
+在已有的 ROS2/Nav2 巡检项目中，开发了状态观察节点和排队报警撤销功能，增加了导航反馈观察，并完成启动集成、断点调试和回归验证。
+
+而理解项目思路是：两个节点、三条调用链、一个验证闭环；
+具体而言是：谁收到什么、调用谁、改变什么、怎样证明？
