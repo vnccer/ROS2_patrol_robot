@@ -6,7 +6,7 @@ ament_python_install_package(${PROJECT_NAME})
 # Windows transfers may drop executable bits. Install links to prepared build copies
 # with explicit permissions, while the Python package itself remains symlinked.
 set(patrol_node_scripts "")
-foreach(script lightweight_sim velocity_guard control_panel)
+foreach(script lightweight_sim velocity_guard)
   set(prepared "${CMAKE_CURRENT_BINARY_DIR}/scripts/${script}")
   configure_file("scripts/${script}" "${prepared}" COPYONLY)
   file(CHMOD "${prepared}" PERMISSIONS
@@ -14,5 +14,4 @@ foreach(script lightweight_sim velocity_guard control_panel)
   list(APPEND patrol_node_scripts "${prepared}")
 endforeach()
 install(PROGRAMS ${patrol_node_scripts} DESTINATION lib/${PROJECT_NAME})
-install(DIRECTORY web DESTINATION share/${PROJECT_NAME})
 ament_package()

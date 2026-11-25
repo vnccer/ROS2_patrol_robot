@@ -44,12 +44,12 @@ if [[ "${ID}" != ubuntu || "${VERSION_ID}" != 22.04 ]]; then
   exit 1
 fi
 if [[ ! -f /opt/ros/humble/setup.bash ]]; then
-  echo 'Install ROS2 Humble first: docs/环境与工具/ROS2环境配置humble.md' >&2
+  echo 'Install ROS2 Humble first: docs/ROS2环境配置humble.md' >&2
   exit 1
 fi
 sudo apt-get update
 sudo apt-get install -y curl build-essential python3-colcon-common-extensions python3-rosdep \
-  python3-yaml python3-pytest ros-humble-navigation2 ros-humble-nav2-bringup \
+  python3-yaml ros-humble-navigation2 ros-humble-nav2-bringup \
   ros-humble-rviz2 ros-humble-robot-state-publisher
 if [[ "$PATROL_INSTALL_GAZEBO" == true ]]; then
   sudo apt-get install -y ros-humble-gazebo-ros-pkgs ros-humble-turtlebot3-gazebo \
@@ -88,8 +88,6 @@ rosdep install --from-paths src --ignore-src --rosdistro humble -r -y
 colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo
 colcon test --event-handlers console_direct+
 colcon test-result --verbose
-python3 tools/build_core.py
-python3 -m pytest tests -q
 mkdir -p test_results
 dpkg-query -W 'ros-humble-*' > test_results/installed_ros_packages.txt
 echo 'Ready: bash scripts/run.sh'

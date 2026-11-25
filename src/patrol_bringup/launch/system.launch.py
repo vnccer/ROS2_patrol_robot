@@ -18,7 +18,6 @@ def setup(context):
     sim_time = backend == 'gazebo'
     mission_path = LaunchConfiguration('mission').perform(context)
     params_path = LaunchConfiguration('nav_params').perform(context)
-    mission = yaml.safe_load(Path(mission_path).read_text(encoding='utf-8'))['mission_manager']['ros__parameters']
     nav = yaml.safe_load(Path(params_path).read_text(encoding='utf-8'))
     configured_nav = ParameterFile(RewrittenYaml(source_file=params_path,
         param_rewrites={'use_sim_time':str(sim_time).lower()},convert_types=True))
@@ -32,7 +31,7 @@ def setup(context):
             log_level = LaunchConfiguration('mission_log_level').perform(context)
         elif pkg.startswith('nav2_'):
             log_level = LaunchConfiguration('nav_log_level').perform(context)
-        elif node_name in ('control_panel', 'patrol_node'):
+        elif node_name == 'patrol_node':
             log_level = 'info'
         else:
             log_level = 'warn'
@@ -96,9 +95,6 @@ def setup(context):
               node('patrol_manager','mission_manager',parameters=[mission_path,{'use_sim_time':sim_time}]),
               node('patrol_sim','velocity_guard',parameters=[{'use_sim_time':sim_time}])]
     nodes.append(node('patrol_manager', 'patrol_node', parameters=[{'use_sim_time': sim_time}]))
-    if LaunchConfiguration('panel').perform(context).lower()=='true':
-        nodes.append(node('patrol_sim','control_panel',parameters=[{'use_sim_time':sim_time,
-                     'waypoints':mission['waypoints']}]))
     if LaunchConfiguration('rviz').perform(context).lower()=='true':
         nodes.append(node('rviz2','rviz2',arguments=['-d',str(root/'rviz/patrol.rviz')],
                           parameters=[{'use_sim_time':sim_time}]))
@@ -110,7 +106,6 @@ def generate_launch_description():
         DeclareLaunchArgument('backend',default_value='lightweight',description='lightweight | gazebo'),
         DeclareLaunchArgument('rviz',default_value='true'),
         DeclareLaunchArgument('gui',default_value='false',description='Gazebo GUI; headless is easier on VMware'),
-        DeclareLaunchArgument('panel',default_value='true'),
         DeclareLaunchArgument('mission_log_level',default_value='info',
             choices=['debug','info','warn','error','fatal'],
             description='Mission logs; debug includes receipt counts and patrol completion'),
