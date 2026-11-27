@@ -1,41 +1,34 @@
+#include <chrono>
 #include <memory>
 #include <string>
-#include <chrono>
-#include "std_msgs/msg/string.hpp"
-#include "rclcpp/rclcpp.hpp"
+
 #include "patrol_interfaces/msg/mission_status.hpp"
+#include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/string.hpp"
 #include "std_srvs/srv/trigger.hpp"
 
 // 自己的节点类，继承 ROS2 节点的基本能力。
-class PatrolNode : public rclcpp::Node
-{
+class PatrolNode : public rclcpp::Node {
 public:
-  explicit PatrolNode(const std::string &node_name) : Node(node_name)
-  {
+  explicit PatrolNode(const std::string &node_name) : Node(node_name) {
     RCLCPP_INFO(this->get_logger(), "Patrol node started.");
 
     // 创建状态订阅器
     status_sub_ = this->create_subscription<patrol_interfaces::msg::MissionStatus>(
       "/patrol/status", 10,
-      [this](patrol_interfaces::msg::MissionStatus::ConstSharedPtr m)
-      {
+      [this](patrol_interfaces::msg::MissionStatus::ConstSharedPtr m) {
         on_status(m);
-      }
-    );
+      });
 
     // 创建摘要发布器
-    summary_pub_ = this->create_publisher<std_msgs::msg::String>(
-      "/patrol/summary", 10
-    );
+    summary_pub_ = this->create_publisher<std_msgs::msg::String>("/patrol/summary", 10);
 
     // 创建定时器
     summary_timer_ = this->create_wall_timer(
       std::chrono::seconds(1),
-      [this]()
-      {
+      [this]() {
         publish_summary();
-      }
-    );
+      });
 
     // 创建清零统计服务
     reset_count_service_ = this->create_service<std_srvs::srv::Trigger>(
@@ -43,49 +36,35 @@ public:
       [this](
         std_srvs::srv::Trigger::Request::SharedPtr, // 指向请求对象的共享指针（该服务没有要读取的参数，故省略参数名）
         std_srvs::srv::Trigger::Response::SharedPtr response // 指向响应对象的共享指针
-      )
-      {
+      ) {
         status_received_count_ = 0;
         response->success = true;
         response->message = "Status received reset.";
-      }
-    );
-
+      });
   }
 
 private:
-  rclcpp::Subscription<patrol_interfaces::msg::MissionStatus>::SharedPtr status_sub_; // 保存订阅对象
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr summary_pub_; // 保存发布器对象
-  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reset_count_service_; // 保存服务对象
-  rclcpp::TimerBase::SharedPtr summary_timer_; // 保存定时器对象
-  std::string last_state_; // 保存上一次的状态，避免重复打印
-  unsigned int status_received_count_{0}; // 保存收到过多少条状态消息
-  patrol_interfaces::msg::MissionStatus::ConstSharedPtr last_status_; // 保存上一次的完整状态消息
-  bool has_status_{false}; // 是否已经收到过状态消息
-
   // 状态回调函数
   void on_status(patrol_interfaces::msg::MissionStatus::ConstSharedPtr m) {
     ++status_received_count_;
     last_status_ = m;
     has_status_ = true;
-    if (m->state != last_state_)
-    {
+    if (m->state != last_state_) {
       // 打印收到的状态
       RCLCPP_INFO(
         this->get_logger(),
         "received=%u state=%s",
         status_received_count_,
-        m->state.c_str()
-      );
+        m->state.c_str());
       // 保存当前状态，供下一次回调比较
       last_state_ = m->state;
     }
   }
 
   // 定时器回调函数
-  void publish_summary(){
+  void publish_summary() {
     std_msgs::msg::String msg; // 先准备一个空的消息对象，其中有字段data用于保存字符串
-    if (!has_status_){
+    if (!has_status_) {
       msg.data = "NO_STATUS";
     } else {
       msg.data =
@@ -97,10 +76,17 @@ private:
     summary_pub_->publish(msg); // 让summary_pub_指向的发布器调用它的publish函数，发布msg消息
   }
 
+  rclcpp::Subscription<patrol_interfaces::msg::MissionStatus>::SharedPtr status_sub_; // 保存订阅对象
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr summary_pub_; // 保存发布器对象
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reset_count_service_; // 保存服务对象
+  rclcpp::TimerBase::SharedPtr summary_timer_; // 保存定时器对象
+  std::string last_state_; // 保存上一次的状态，避免重复打印
+  unsigned int status_received_count_{0}; // 保存收到过多少条状态消息
+  patrol_interfaces::msg::MissionStatus::ConstSharedPtr last_status_; // 保存上一次的完整状态消息
+  bool has_status_{false}; // 是否已经收到过状态消息
 }; // PatrolNode class类结束
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
   // 初始化 ROS2，随后创建自己的节点对象。
   rclcpp::init(argc, argv);
   auto node = std::make_shared<PatrolNode>("patrol_node");
