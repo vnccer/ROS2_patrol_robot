@@ -1,6 +1,6 @@
 # 一、Ubuntu git
 
-1. 首次使用，配置身份
+## 1. 首次使用，配置身份
 
 ```bash
 # 设置提交代码时的全局用户名
@@ -10,9 +10,9 @@ git config --global user.name "你的GitHub用户名"
 git config --global user.email "你的GitHub注册邮箱"
 ```
 
-2. 生成与配置SSH密钥
+## 2. 生成与配置SSH密钥
 
-```
+```bash
 # 生成 SSH 密钥（⚠️ 重要：提示输入保存路径时，直接按回车！不要自己打字命名！）
 ssh-keygen -t ed25519 -C "你的GitHub注册邮箱"
 
@@ -26,9 +26,9 @@ ssh-add ~/.ssh/id_ed25519
 cat ~/.ssh/id_ed25519.pub
 ```
 
-3. 连接测试与仓库关联
+## 3. 连接测试与仓库关联
 
-```
+```bash
 # 测试 SSH 连接（输入 yes 回车，⚠️ 必须看到 "Hi 你的用户名!"，如果名字不对说明 GitHub 绑错账号了）
 ssh -T git@github.com
 
@@ -39,11 +39,20 @@ git remote -v
 git remote set-url origin git@github.com:你的GitHub用户名/你的仓库名.git
 ```
 
-4. 日常开发提交流程
+## 4. 日常开发提交流程
 
-```
+```bash
 git add .
 git commit -m ""
 git push origin main
 ```
+
+## 5. 更新项目（强制与远程同步，会丢弃本地修改）
+
+```bash
+git fetch origin        # 拉取远程最新
+git reset --hard @{u}   # 强制同步工作区为远程分支
+git clean -fd           # 删除未跟踪的残留文件
+```
+
 
