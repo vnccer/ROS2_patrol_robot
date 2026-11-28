@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>argc / char **argv 交互图解</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-muted: #f1f5f9;
+      --border: #cbd5e1;
+      --border-soft: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --primary: #2563eb;
+      --primary-text: #ffffff;
+      --c1: #2563eb;
+      --c2: #059669;
+      --shadow: 0 4px 20px rgba(15, 23, 42, 0.06);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #0f172a;
+        --surface: #1e293b;
+        --surface-muted: #334155;
+        --border: #475569;
+        --border-soft: #334155;
+        --text: #f1f5f9;
+        --text-muted: #94a3b8;
+        --primary: #3b82f6;
+        --primary-text: #ffffff;
+        --c1: #60a5fa;
+        --c2: #34d399;
+        --shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+      }
+    }
+
+    :root[data-theme="dark"] {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-muted: #334155;
+      --border: #475569;
+      --border-soft: #334155;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --primary: #3b82f6;
+      --primary-text: #ffffff;
+      --c1: #60a5fa;
+      --c2: #34d399;
+      --shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 20px 16px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    .header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .title-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: var(--c1);
+    }
+
+    .pill {
+      font-size: 12px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--border-soft);
+      color: var(--text-muted);
+    }
+
+    .pill strong { color: var(--text); }
+
+    .theme-btn {
+      padding: 5px 11px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border-soft);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+      user-select: none;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-soft);
+      font-size: 13px;
+    }
+
+    .word-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .muted { color: var(--text-muted); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+
+    .word-btn {
+      padding: 5px 10px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .word-btn.active {
+      background: var(--primary);
+      color: var(--primary-text);
+      border-color: var(--primary);
+    }
+
+    .next-btn {
+      padding: 6px 14px;
+      border-radius: 8px;
+      border: none;
+      background: var(--primary);
+      color: var(--primary-text);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .next-btn:hover { opacity: 0.9; }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    @media (max-width: 600px) {
+      .steps { grid-template-columns: 1fr; }
+    }
+
+    .step-btn {
+      text-align: left;
+      padding: 7px 11px;
+      border-radius: 8px;
+      border: 1.5px solid var(--border-soft);
+      background: transparent;
+      color: var(--text);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .step-btn .step-title { font-weight: 700; font-size: 13px; }
+    .step-btn .step-sub { color: var(--text-muted); margin-top: 2px; }
+
+    .svg-wrap {
+      width: 100%;
+      overflow-x: auto;
+      margin: 6px 0;
+    }
+
+    svg {
+      width: 100%;
+      height: auto;
+      display: block;
+      min-width: 620px;
+    }
+
+    .clickable { cursor: pointer; }
+    .fade { transition: opacity 0.22s ease; }
+    .door {
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      transform-box: fill-box;
+      transform-origin: left center;
+    }
+    .door-open { opacity: 0.08; transform: scaleX(0.18); }
+
+    .path-anim {
+      stroke-dasharray: 6 4;
+      animation: dash 0.9s linear infinite;
+    }
+    @keyframes dash {
+      to { stroke-dashoffset: -20; }
+    }
+
+    .caption {
+      padding-top: 10px;
+      border-top: 1px solid var(--border-soft);
+      font-size: 14px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="title-wrap">
+        <h1>int main(int argc, char **argv)</h1>
+        <span class="pill"><strong>纸条</strong> = 指针 <code>*</code> &nbsp;|&nbsp; <strong>格子</strong> = 内存</span>
+      </div>
+      <button id="theme-toggle" class="theme-btn" type="button">亮/暗</button>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <div class="word-group">
+          <span class="muted mono">argc=3</span>
+          <button data-word="0" class="word-btn" type="button">[0] ./app</button>
+          <button data-word="1" class="word-btn" type="button">[1] -r</button>
+          <button data-word="2" class="word-btn" type="button">[2] debug</button>
+        </div>
+        <button id="next-btn" class="next-btn" type="button">下一步 →</button>
+      </div>
+
+      <div class="steps">
+        <button data-step="0" class="step-btn" type="button">
+          <div class="step-title">① 起点</div>
+          <div class="step-sub mono">argv (char **)</div>
+        </button>
+        <button data-step="1" class="step-btn" type="button">
+          <div class="step-title">② 第 1 颗 *</div>
+          <div class="step-sub">开格 → 还是纸条</div>
+        </button>
+        <button data-step="2" class="step-btn" type="button">
+          <div class="step-title">③ 第 2 颗 *</div>
+          <div class="step-sub">开格 → 拿到字母</div>
+        </button>
+      </div>
+
+      <div class="svg-wrap">
+        <svg id="scene" viewBox="0 0 740 240" role="img" aria-label="指针与内存格子交互图">
+          <defs>
+            <marker id="arr-1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--c1)" />
+            </marker>
+            <marker id="arr-2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--c2)" />
+            </marker>
+          </defs>
+
+          <rect x="188" y="6" width="544" height="228" rx="10" fill="none" stroke="var(--border)" stroke-dasharray="4 3" stroke-width="1.2" />
+          <text x="200" y="23" font-size="12" font-weight="600" fill="var(--text-muted)">同一块内存（全是带编号的格子）</text>
+
+          <!-- 手里的指针纸条 -->
+          <g id="hand-note" class="clickable">
+            <text x="80" y="23" text-anchor="middle" font-size="12" font-weight="600" fill="var(--text-muted)">指针纸条</text>
+            <path d="M 14 54 L 128 54 L 146 72 L 146 168 L 14 168 Z" fill="var(--surface)" stroke="var(--c1)" stroke-width="2" />
+            <path d="M 128 54 L 128 72 L 146 72 Z" fill="var(--surface-muted)" stroke="var(--c1)" stroke-width="1.2" />
+            <text x="24" y="77" font-size="14" font-family="ui-monospace, monospace" font-weight="700" fill="var(--text)">argv</text>
+            <text x="24" y="96" font-size="12" font-family="ui-monospace, monospace" font-weight="700" fill="var(--c1)">char **</text>
+            <line x1="24" y1="106" x2="136" y2="106" stroke="var(--border-soft)" stroke-width="1" />
+            <text x="24" y="130" font-size="13" font-family="ui-monospace, monospace" font-weight="700" fill="var(--c1)">去 500 号</text>
+            <text id="hand-offset" x="24" y="152" font-size="12" fill="var(--text-muted)">+2 → 502号</text>
+          </g>
+
+          <text x="278" y="42" text-anchor="middle" font-size="12" fill="var(--text-muted)">里面放：纸条 (char*)</text>
+          <g id="note-lockers"></g>
+
+          <text x="572" y="42" text-anchor="middle" font-size="12" fill="var(--text-muted)">里面放：字母 (char，\0 结束)</text>
+          <g id="char-lockers"></g>
+
+          <path id="hop1-arrow" d="" fill="none" stroke="var(--c1)" stroke-width="2.4" marker-end="url(#arr-1)" class="path-anim fade" opacity="0" />
+          <g id="hop1-badge" class="fade" opacity="0">
+            <rect x="148" y="176" width="60" height="22" rx="11" fill="var(--surface)" stroke="var(--c1)" stroke-width="1.4" />
+            <text x="178" y="191" text-anchor="middle" font-size="12" font-weight="700" fill="var(--c1)">第1颗 *</text>
+          </g>
+
+          <path id="hop2-arrow" d="" fill="none" stroke="var(--c2)" stroke-width="2.4" marker-end="url(#arr-2)" class="path-anim fade" opacity="0" />
+          <g id="hop2-badge" class="fade" opacity="0">
+            <rect x="364" y="176" width="60" height="22" rx="11" fill="var(--surface)" stroke="var(--c2)" stroke-width="1.4" />
+            <text x="394" y="191" text-anchor="middle" font-size="12" font-weight="700" fill="var(--c2)">第2颗 *</text>
+          </g>
+        </svg>
+      </div>
+
+      <div id="caption" class="caption"></div>
+    </div>
+  </div>
+
+  <script>
+    const words = [
+      { idx: 0, noteBox: 500, charBox: 100, text: './app', chars: ['.', '/', 'a', 'p', 'p', '\\0'] },
+      { idx: 1, noteBox: 501, charBox: 200, text: '-r',    chars: ['-', 'r', '\\0'] },
+      { idx: 2, noteBox: 502, charBox: 300, text: 'debug', chars: ['d', 'e', 'b', 'u', 'g', '\\0'] }
+    ];
+
+    const NS = 'http://www.w3.org/2000/svg';
+    const el = (tag, attrs = {}, text = null) => {
+      const n = document.createElementNS(NS, tag);
+      for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+      if (text !== null) n.textContent = text;
+      return n;
+    };
+
+    const noteLockers = document.getElementById('note-lockers');
+    const charLockers = document.getElementById('char-lockers');
+    const rowY = [52, 112, 172];
+    const boxH = 52;
+
+    words.forEach((w, i) => {
+      const y = rowY[i];
+      const g = el('g', { class: 'clickable note-box', 'data-idx': i });
+
+      g.appendChild(el('rect', {
+        x: 204, y, width: 148, height: boxH, rx: 6,
+        fill: 'var(--surface)', stroke: 'var(--border)', 'stroke-width': 1.5, class: 'frame'
+      }));
+      g.appendChild(el('text', {
+        x: 212, y: y + 17, 'font-size': 12, 'font-family': 'ui-monospace, monospace', fill: 'var(--text-muted)'
+      }, `${w.noteBox}号`));
+      g.appendChild(el('text', {
+        x: 344, y: y + 17, 'text-anchor': 'end', 'font-size': 12, 'font-family': 'ui-monospace, monospace', fill: 'var(--text-muted)'
+      }, `argv[${i}]`));
+
+      const innerNote = el('g', { class: 'inner-note fade' });
+      innerNote.appendChild(el('path', {
+        d: `M 214 ${y + 23} L 332 ${y + 23} L 340 ${y + 31} L 340 ${y + 46} L 214 ${y + 46} Z`,
+        fill: 'var(--bg)', stroke: 'var(--c2)', 'stroke-width': 1.3
+      }));
+      innerNote.appendChild(el('text', {
+        x: 222, y: y + 39, 'font-size': 12, 'font-family': 'ui-monospace, monospace', 'font-weight': 700, fill: 'var(--c2)'
+      }, `纸条: 去 ${w.charBox}号`));
+      g.appendChild(innerNote);
+
+      const door = el('g', { class: 'door note-door', 'data-idx': i });
+      door.appendChild(el('rect', {
+        x: 206, y: y + 21, width: 144, height: 29, rx: 4,
+        fill: 'var(--surface-muted)', stroke: 'var(--border)', 'stroke-width': 1
+      }));
+      door.appendChild(el('circle', { cx: 341, cy: y + 35.5, r: 2.5, fill: 'var(--text-muted)' }));
+      door.appendChild(el('text', {
+        x: 274, y: y + 40, 'text-anchor': 'middle', 'font-size': 12, fill: 'var(--text-muted)'
+      }, '点开'));
+      g.appendChild(door);
+
+      g.addEventListener('click', () => { state.word = i; state.step = 1; render(); });
+      noteLockers.appendChild(g);
+    });
+
+    words.forEach((w, i) => {
+      const y = rowY[i];
+      const rowG = el('g', { class: 'char-row', 'data-idx': i });
+
+      w.chars.forEach((ch, j) => {
+        const x = 428 + j * 49;
+        const isEnd = ch === '\\0';
+        const g = el('g', { class: 'clickable char-box', 'data-idx': i });
+
+        g.appendChild(el('rect', {
+          x, y, width: 45, height: boxH, rx: 6,
+          fill: 'var(--surface)', stroke: 'var(--border)', 'stroke-width': 1.5, class: 'cframe'
+        }));
+        g.appendChild(el('text', {
+          x: x + 22.5, y: y + 17, 'text-anchor': 'middle', 'font-size': 12,
+          'font-family': 'ui-monospace, monospace', fill: 'var(--text-muted)'
+        }, String(w.charBox + j)));
+        g.appendChild(el('text', {
+          x: x + 22.5, y: y + 41, 'text-anchor': 'middle', 'font-size': 14,
+          'font-family': 'ui-monospace, monospace', 'font-weight': 700,
+          fill: isEnd ? 'var(--text-muted)' : 'var(--text)'
+        }, ch));
+
+        const door = el('g', { class: 'door char-door', 'data-idx': i });
+        door.appendChild(el('rect', {
+          x: x + 2, y: y + 21, width: 41, height: 29, rx: 4,
+          fill: 'var(--surface-muted)', stroke: 'var(--border)', 'stroke-width': 1
+        }));
+        door.appendChild(el('circle', { cx: x + 37, cy: y + 35.5, r: 2, fill: 'var(--text-muted)' }));
+        g.appendChild(door);
+
+        g.addEventListener('click', () => { state.word = i; state.step = 2; render(); });
+        rowG.appendChild(g);
+      });
+
+      charLockers.appendChild(rowG);
+    });
+
+    const state = { word: 2, step: 0 };
+    const handOffset = document.getElementById('hand-offset');
+    const hop1Arrow = document.getElementById('hop1-arrow');
+    const hop1Badge = document.getElementById('hop1-badge');
+    const hop2Arrow = document.getElementById('hop2-arrow');
+    const hop2Badge = document.getElementById('hop2-badge');
+    const caption = document.getElementById('caption');
+    const nextBtn = document.getElementById('next-btn');
+
+    function render() {
+      const w = words[state.word];
+      const yMid = rowY[state.word] + boxH / 2;
+
+      document.querySelectorAll('.word-btn').forEach(btn => {
+        btn.classList.toggle('active', Number(btn.dataset.word) === state.word);
+      });
+
+      document.querySelectorAll('.step-btn').forEach(btn => {
+        const s = Number(btn.dataset.step);
+        const active = s === state.step;
+        btn.style.backgroundColor = active ? 'var(--surface-muted)' : 'transparent';
+        btn.style.borderColor = active ? (s === 2 ? 'var(--c2)' : 'var(--c1)') : 'var(--border-soft)';
+        btn.style.opacity = s <= state.step ? '1' : '0.6';
+      });
+
+      handOffset.textContent = state.word === 0 ? '→ 500号' : `+${state.word} → ${w.noteBox}号`;
+
+      document.querySelectorAll('.note-box').forEach(box => {
+        const idx = Number(box.dataset.idx);
+        const isTarget = idx === state.word;
+        const opened = isTarget && state.step >= 1;
+        box.style.opacity = state.step === 0 || isTarget ? '1' : '0.32';
+        box.querySelector('.note-door').classList.toggle('door-open', opened);
+        const frame = box.querySelector('.frame');
+        frame.setAttribute('stroke', opened ? 'var(--c1)' : 'var(--border)');
+        frame.setAttribute('stroke-width', opened ? '2.2' : '1.5');
+      });
+
+      document.querySelectorAll('.char-row').forEach(row => {
+        const idx = Number(row.dataset.idx);
+        const isTarget = idx === state.word;
+        const opened = isTarget && state.step >= 2;
+        row.style.opacity = state.step < 2 ? (isTarget ? '0.65' : '0.28') : (isTarget ? '1' : '0.25');
+        row.querySelectorAll('.char-door').forEach(d => d.classList.toggle('door-open', opened));
+        row.querySelectorAll('.cframe').forEach(f => {
+          f.setAttribute('stroke', opened ? 'var(--c2)' : 'var(--border)');
+          f.setAttribute('stroke-width', opened ? '2' : '1.5');
+        });
+      });
+
+      if (state.step >= 1) {
+        hop1Arrow.setAttribute('d', `M 148 112 C 176 112, 176 ${yMid}, 201 ${yMid}`);
+        hop1Arrow.setAttribute('opacity', '1');
+        hop1Badge.setAttribute('opacity', '1');
+      } else {
+        hop1Arrow.setAttribute('opacity', '0');
+        hop1Badge.setAttribute('opacity', '0');
+      }
+
+      if (state.step >= 2) {
+        hop2Arrow.setAttribute('d', `M 353 ${yMid} L 424 ${yMid}`);
+        hop2Arrow.setAttribute('opacity', '1');
+        hop2Badge.setAttribute('opacity', '1');
+      } else {
+        hop2Arrow.setAttribute('opacity', '0');
+        hop2Badge.setAttribute('opacity', '0');
+      }
+
+      if (state.step === 0) {
+        nextBtn.textContent = '找第 1 次 (*) →';
+        caption.innerHTML = `① 手拿指针 <code class="mono">argv</code> → 去 <strong>${w.noteBox}号</strong>`;
+      } else if (state.step === 1) {
+        nextBtn.textContent = '找第 2 次 (**) →';
+        caption.innerHTML = `② 开 <strong>${w.noteBox}号</strong> → 里面还是指针，指向 <strong>${w.charBox}号</strong>`;
+      } else {
+        nextBtn.textContent = '重来 ↺';
+        caption.innerHTML = `③ 开 <strong>${w.charBox}号</strong> → 读到字母 <strong class="mono">"${w.text}"</strong>`;
+      }
+    }
+
+    document.querySelectorAll('.word-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.word = Number(btn.dataset.word);
+        state.step = Math.max(state.step, 1);
+        render();
+      });
+    });
+
+    document.querySelectorAll('.step-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.step = Number(btn.dataset.step);
+        render();
+      });
+    });
+
+    document.getElementById('hand-note').addEventListener('click', () => {
+      state.step = 0;
+      render();
+    });
+
+    nextBtn.addEventListener('click', () => {
+      state.step = (state.step + 1) % 3;
+      render();
+    });
+
+    document.getElementById('theme-toggle').addEventListener('click', () => {
+      const root = document.documentElement;
+      const current = root.getAttribute('data-theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (!current) root.setAttribute('data-theme', prefersDark ? 'light' : 'dark');
+      else root.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+    });
+
+    render();
+  </script>
+</body>
+</html>
